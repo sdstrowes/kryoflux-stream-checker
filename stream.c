@@ -492,12 +492,6 @@ void plot_track(struct track *track, struct colour *buffer, uint16_t width, uint
 		pos++;
 	}
 
-	printf("parp: %x %x\n", start, end);
-
-//	if (j < track->flux_array_idx && track->flux_array[j].stream_pos != index) {
-//		printf("WARNING: SEEK ERROR ON INDEX %u, %x", i, index);
-//		return j;
-//	}
 
 	// parse whole track
 	double fraction = (360.0/(end-start));
@@ -507,9 +501,9 @@ void plot_track(struct track *track, struct colour *buffer, uint16_t width, uint
 		uint32_t x_scaled = x*6 + (width/2);
 		uint32_t y_scaled = y*6 + (height/2);
 
-		printf("pos: %u end:%u start:%u fraction:%f angle:%f x:%f y:%f, x:%u y:%u, fx:%u\n",
-			pos-start, end, start, fraction, (pos-start)*fraction,
-			x, y, x_scaled, y_scaled, track->flux_array[pos].flux_val);
+//		printf("pos: %u start:%u end:%u angle:%f x:%f y:%f, x:%u y:%u, fx:%u\n",
+//			pos-start, start, end, (pos-start)*fraction,
+//			x, y, x_scaled, y_scaled, track->flux_array[pos].flux_val);
 
 		if (track->flux_array[pos].flux_val/track->sample_clock > 0.0000075) {
 			buffer[y_scaled*width + x_scaled].r = 255;
@@ -522,7 +516,6 @@ void plot_track(struct track *track, struct colour *buffer, uint16_t width, uint
 		}
 		
 
-		//buffer[y_scaled*width + x_scaled] = (float)track->flux_array[pos].flux_val;
 		pos++;
 	}
 
