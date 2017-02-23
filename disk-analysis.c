@@ -166,8 +166,6 @@ int main(int argc, char *argv[])
 //		}
 //	}
 
-	vis_stream(&track[43]);
-
 	for (track_num = 25; track_num < 50; track_num++) {
 		//for (side = 0; side < SIDES; side++) {
 			plot_track(&track[side ? track_num + TRACK_MAX : track_num], img_buffer, width, height);

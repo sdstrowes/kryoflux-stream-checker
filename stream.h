@@ -39,7 +39,6 @@ struct colour {
 int  parse_stream(char *, struct track *, uint8_t side, uint8_t track);
 int  decode_stream(struct track *);
 void dump_stream(struct track *);
-int  vis_stream(struct track *);
 void plot_track(struct track *, struct colour *, uint16_t, uint16_t);
 void free_stream(struct track *);
 

@@ -479,48 +479,6 @@ int decode_stream(struct track *track)
 	return 0;
 }
 
-int vis_stream(struct track *track)
-{
-//	uint32_t flux_count = 0;
-
-	uint32_t pos = 0;
-
-	uint32_t start = track->indices[0].stream_pos;
-	uint32_t end   = track->indices[1].stream_pos;
-
-	// Seek forward to start
-	uint32_t j = 0;
-	while (j < track->flux_array_idx && pos < start) {
-		pos++;
-	}
-
-	printf("parp: %x %x\n", start, end);
-
-//	if (j < track->flux_array_idx && track->flux_array[j].stream_pos != index) {
-//		printf("WARNING: SEEK ERROR ON INDEX %u, %x", i, index);
-//		return j;
-//	}
-
-	// parse whole track
-	double fraction = (360.0/(end-start));
-	while (pos < track->flux_array_idx && pos < end) {
-		printf("pos: %u end:%u start:%u fraction:%f angle:%f x:%f y:%f\n",
-			pos-start, end, start, fraction, (pos-start)*fraction,
-			track->track * sin((pos-start)*fraction*(M_PI/180)),
-			track->track * cos((pos-start)*fraction*(M_PI/180)));
-		pos++;
-	}
-//
-//	// Decoder must manually insert an empty flux at the end.
-//	if (track->flux_array[j].stream_pos != next_index) {
-//		printf("[%5x] NOT FOUND, AT END? %x %x\n",
-//			next_index,
-//			track->flux_array[j-1].stream_pos, next_index);
-//	}
-
-	return 0;
-}
-
 void plot_track(struct track *track, struct colour *buffer, uint16_t width, uint16_t height)
 {
 	uint32_t pos = 0;
