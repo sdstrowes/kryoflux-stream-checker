@@ -27,9 +27,6 @@ void append_flux(struct track *track, uint16_t flux_val, uint32_t stream_pos)
 	if (track->flux_array_idx >= track->flux_array_max - 1) {
 		uint32_t old_max = track->flux_array_max;
 		track->flux_array_max *= 2;
-//		struct flux *tmp = (struct flux *)realloc(track->flux_array, sizeof(struct flux)*track->flux_array_max);
-//		track->flux_array = tmp;
-
 
 		struct flux *tmp = (struct flux *)calloc(track->flux_array_max, sizeof(struct flux));
 		if (track->flux_array != NULL) {
@@ -102,7 +99,6 @@ int parse_kfinfo(FILE *f, struct track *track)
 	rc = sscanf(str, "name=KryoFlux DiskSystem, version=2.20s, date=Jan  8 2015, time=13:49:26, hwid=1, hwrv=1, sck=%lf, ick=%lf", &track->sample_clock, &track->index_clock);
 
 	printf("[%5x] KFINFO: '%s'\n", stream_pos, str);
-	//stream_pos += 4 + val;
 
 	free(str);
 
@@ -226,7 +222,6 @@ int parse_oob(FILE *f, struct track *track)
 		}
 
 		printf("[%5x] Stream end: pos:%08x result_code:%08x\n", stream_pos, oob_stream_pos, oob_result_code);
-		//stream_pos += 12;
 		break;
 	}
 	case 0x04: {
@@ -243,7 +238,6 @@ int parse_oob(FILE *f, struct track *track)
 		if (rc < 1 || tmp != 0x0d) { return 1; }
 
 		printf("[%5x] EOF\n", stream_pos);
-		//stream_pos += 4;
 		break;
 	}
 	default: {
@@ -281,7 +275,6 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 	track->flux_array_idx = 0;
 	track->flux_array_max = 1;
 	track->flux_array = NULL;
-//(struct flux *)calloc(sizeof(struct flux)*track->flux_array_max);
 
 
 	printf("CLOCKS: %.10f %.10f %.10f\n",
@@ -466,9 +459,6 @@ int decode_stream(struct track *track)
 			diff,
 			diff/track->sample_clock);
 		printf("RPM: %f\n", 60/(diff/track->sample_clock));
-//		if (i != 0) {
-//			printf("COUNT: %u %u %u %u\n", track->side, track->track, i, flux_count);
-//		}
 
 		last_index_counter  = track->indices[i].index_counter;
 		last_sample_counter = track->indices[i].sample_counter;
