@@ -12,9 +12,6 @@
 #define TRACK_MAX 84
 #define SIDES      2
 
-//#define TRACK_MAX 8
-//#define SIDES      2
-
 
 void print_help(char *binary_name)
 {
@@ -27,22 +24,6 @@ void setRGB(png_byte *ptr, struct colour val)
 	ptr[0] = val.r;
 	ptr[1] = val.g;
 	ptr[2] = val.b;
-
-
-//	int v = (int)(val * 767);
-//	if (v < 0) v = 0;
-//	if (v > 767) v = 767;
-//	int offset = v % 256;
-//
-//	if (v<256) {
-//		ptr[0] = 0; ptr[1] = 0; ptr[2] = offset;
-//	}
-//	else if (v<512) {
-//		ptr[0] = 0; ptr[1] = offset; ptr[2] = 255-offset;
-//	}
-//	else {
-//		ptr[0] = offset; ptr[1] = 255-offset; ptr[2] = 0;
-//	}
 }
 
 int dump_stream_img(struct colour *buffer, uint16_t width, uint16_t height)
