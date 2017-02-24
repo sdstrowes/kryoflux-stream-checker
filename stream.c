@@ -486,10 +486,10 @@ void plot_track(struct track *track, struct colour *buffer, uint16_t width, uint
 	// parse whole track
 	double fraction = (360.0/(end-start));
 	while (pos < track->flux_array_idx && pos < end) {
-		float x = track->track * 0.5 * sin((pos-start)*fraction*(M_PI/180));
-		float y = track->track * 0.5 * cos((pos-start)*fraction*(M_PI/180));
-		uint32_t x_scaled = x*6 + (width/2);
-		uint32_t y_scaled = y*6 + (height/2);
+		float x = (track->track * 0.5 + 42) * sin((pos-start)*fraction*(M_PI/180));
+		float y = (track->track * 0.5 + 42) * cos((pos-start)*fraction*(M_PI/180));
+		uint32_t x_scaled = x*20 + (width/2);
+		uint32_t y_scaled = y*20 + (height/2);
 
 //		printf("pos: %u start:%u end:%u angle:%f x:%f y:%f, x:%u y:%u, fx:%u\n",
 //			pos-start, start, end, (pos-start)*fraction,

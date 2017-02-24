@@ -114,8 +114,8 @@ int main(int argc, char *argv[])
 	char c;
 	char *fn_prefix = NULL;
 	struct colour *img_buffer;
-	uint16_t width = 640;
-	uint16_t height = 640;
+	uint16_t width  = 4200;
+	uint16_t height = 4200;
 
 	img_buffer = (struct colour *) malloc(width * height * sizeof(struct colour));
 	if (img_buffer == NULL) {
@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
 //		}
 //	}
 
-	for (track_num = 25; track_num < 50; track_num++) {
+	for (track_num = 0; track_num < 82; track_num++) {
 		//for (side = 0; side < SIDES; side++) {
 			plot_track(&track[side ? track_num + TRACK_MAX : track_num], img_buffer, width, height);
 		//}
