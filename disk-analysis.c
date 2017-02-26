@@ -87,6 +87,7 @@ int dump_stream_img(struct colour *buffer, uint16_t width, uint16_t height)
 
 	// Allocate memory for one row (3 bytes per pixel - RGB)
 	row = (png_bytep) malloc(3 * width * sizeof(png_byte));
+	memset(row, 0, 3 * width * sizeof(png_byte));
 
 	// Write image data
 	int x, y;
@@ -100,9 +101,14 @@ int dump_stream_img(struct colour *buffer, uint16_t width, uint16_t height)
 	// End write
 	png_write_end(png_ptr, NULL);
 
+	free(row); row = NULL;
+
 finalise:
 	if (fp != NULL) fclose(fp);
-	if (info_ptr != NULL) png_free_data(png_ptr, info_ptr, PNG_FREE_ALL, -1);
+	if (info_ptr != NULL) {
+		png_free_data(png_ptr, info_ptr, PNG_FREE_ALL, -1);
+		png_destroy_info_struct(png_ptr, &info_ptr);
+	}
 	if (png_ptr != NULL) png_destroy_write_struct(&png_ptr, (png_infopp)NULL);
 	if (row != NULL) free(row);
 
@@ -122,9 +128,15 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Could not create image buffer\n");
 		return -1;
 	}
+	memset(img_buffer, 0, width * height * sizeof(struct colour));
 
 	struct track *track;
 	track = (struct track *)malloc(sizeof(struct track)*TRACK_MAX*SIDES);
+	if (track == NULL) {
+		fprintf(stderr, "Could not create track buffer\n");
+		return -1;
+	}
+	memset(track, 0, sizeof(struct track)*TRACK_MAX*SIDES);
 
 	while ((c = getopt (argc, argv, "n:")) != -1) {
 		switch (c) {
@@ -174,10 +186,14 @@ int main(int argc, char *argv[])
 
 	dump_stream_img(img_buffer, width, height);
 
+	free(img_buffer); img_buffer = NULL;
 	for (track_num = 0; track_num < TRACK_MAX; track_num++) {
 		for (side = 0; side < SIDES; side++) {
 			free_stream(&track[side ? track_num + TRACK_MAX : track_num]);
 		}
 	}
+	free(track);
+
+	return 0;
 }
 

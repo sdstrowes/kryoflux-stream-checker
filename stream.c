@@ -31,6 +31,7 @@ void append_flux(struct track *track, uint16_t flux_val, uint32_t stream_pos)
 		struct flux *tmp = (struct flux *)calloc(track->flux_array_max, sizeof(struct flux));
 		if (track->flux_array != NULL) {
 			memcpy(tmp, track->flux_array, old_max*sizeof(struct flux));
+			free(track->flux_array);
 		}
 		track->flux_array = tmp;
 	}
