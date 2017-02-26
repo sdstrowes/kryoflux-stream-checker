@@ -1,5 +1,8 @@
 #include <stdint.h>
 
+#ifndef __stream_h__
+#define __stream_h__
+
 struct index {
 	uint32_t stream_pos;
 	uint32_t sample_counter;
@@ -30,15 +33,10 @@ struct track {
 	uint32_t     flux_array_max;
 };
 
-struct colour {
-	uint8_t r;
-	uint8_t g;
-	uint8_t b;
-};
-
 int  parse_stream(char *, struct track *, uint8_t side, uint8_t track);
 int  decode_stream(struct track *);
 void dump_stream(struct track *);
-void plot_track(struct track *, struct colour *, uint16_t, uint16_t);
 void free_stream(struct track *);
+
+#endif
 

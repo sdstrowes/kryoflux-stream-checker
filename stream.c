@@ -1,4 +1,3 @@
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -464,48 +463,6 @@ int decode_stream(struct track *track)
 	}
 
 	return 0;
-}
-
-void plot_track(struct track *track, struct colour *buffer, uint16_t width, uint16_t height)
-{
-	uint32_t pos = 0;
-
-	uint32_t start = track->indices[0].stream_pos;
-	uint32_t end   = track->indices[1].stream_pos;
-
-	// Seek forward to start
-	uint32_t j = 0;
-	while (j < track->flux_array_idx && pos < start) {
-		pos++;
-	}
-
-
-	// parse whole track
-	double fraction = (360.0/(end-start));
-	while (pos < track->flux_array_idx && pos < end) {
-		float x = (track->track * 0.5 + 42) * sin((pos-start)*fraction*(M_PI/180));
-		float y = (track->track * 0.5 + 42) * cos((pos-start)*fraction*(M_PI/180));
-		uint32_t x_scaled = x*20 + (width/2);
-		uint32_t y_scaled = y*20 + (height/2);
-
-//		printf("pos: %u start:%u end:%u angle:%f x:%f y:%f, x:%u y:%u, fx:%u\n",
-//			pos-start, start, end, (pos-start)*fraction,
-//			x, y, x_scaled, y_scaled, track->flux_array[pos].flux_val);
-
-		if (track->flux_array[pos].flux_val/track->sample_clock > 0.0000075) {
-			buffer[y_scaled*width + x_scaled].r = 255;
-		}
-		if (track->flux_array[pos].flux_val/track->sample_clock > 0.0000055) {
-			buffer[y_scaled*width + x_scaled].g = 255;
-		}
-		if (track->flux_array[pos].flux_val/track->sample_clock > 0.0000035) {
-			buffer[y_scaled*width + x_scaled].b = 255;
-		}
-		
-
-		pos++;
-	}
-
 }
 
 void free_stream(struct track *track)
