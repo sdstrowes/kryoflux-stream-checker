@@ -5,9 +5,6 @@
 #include "stream.h"
 
 
-uint32_t stream_pos;
-
-
 void append_index(struct track *track, uint32_t stream_pos, uint32_t sample_counter, uint32_t index_counter)
 {
 	if (track->indices_idx >= track->indices_max - 1) {
@@ -42,7 +39,7 @@ void append_flux(struct track *track, uint16_t flux_val, uint32_t stream_pos)
 }
 
 
-int parse_flux2(FILE *f, struct track *track, uint8_t header_val)
+int parse_flux2(FILE *f, struct track *track, uint8_t header_val, uint32_t stream_pos)
 {
 	uint8_t val;
 	int rc;
@@ -59,7 +56,7 @@ int parse_flux2(FILE *f, struct track *track, uint8_t header_val)
 	return 1;
 }
 
-int parse_flux3(FILE *f, struct track *track)
+int parse_flux3(FILE *f, struct track *track, uint32_t stream_pos)
 {
 	uint8_t val1, val2;
 	int rc;
@@ -80,7 +77,7 @@ int parse_flux3(FILE *f, struct track *track)
 	return 1;
 }
 
-int parse_kfinfo(FILE *f, struct track *track)
+int parse_kfinfo(FILE *f, struct track *track, uint32_t stream_pos)
 {
 	uint16_t val;
 	char *str;
@@ -106,7 +103,7 @@ int parse_kfinfo(FILE *f, struct track *track)
 	return 1;
 }
 
-int parse_oob(FILE *f, struct track *track)
+int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 {
 	int rc;
 	uint8_t val;
@@ -126,7 +123,7 @@ int parse_oob(FILE *f, struct track *track)
 		rc = fread(&tmp, 1, 1, f);
 		if (rc < 1 || tmp != 0x00) { return 1; }
 
-		fprintf(stderr, "Invalid block at pos %x\n", stream_pos);
+		fprintf(stderr, "Invalid block at pos %x\n", *stream_pos);
 		break;
 	}
 	case 0x01: {
@@ -149,14 +146,14 @@ int parse_oob(FILE *f, struct track *track)
 			return 1;
 		}
 
-		if (stream_pos != oob_stream_pos) {
-			printf("[%5x] Stream Info: pos:%08x; transfer time:%4ums\n", stream_pos, oob_stream_pos, oob_transfer_time);
+		if (*stream_pos != oob_stream_pos) {
+			printf("[%5x] Stream Info: pos:%08x; transfer time:%4ums\n", *stream_pos, oob_stream_pos, oob_transfer_time);
 			printf("WARNING: stream_pos:%06x does not match oob:%06x; resetting\n",
-				stream_pos, oob_stream_pos);
-			stream_pos = oob_stream_pos;
+				*stream_pos, oob_stream_pos);
+			*stream_pos = oob_stream_pos;
 		}
 		else {
-			printf("[%5x] Stream Info: transfer time:%4ums\n", stream_pos, oob_transfer_time);
+			printf("[%5x] Stream Info: transfer time:%4ums\n", *stream_pos, oob_transfer_time);
 		}
 
 		break;
@@ -194,7 +191,7 @@ int parse_oob(FILE *f, struct track *track)
 
 		append_index(track, oob_stream_pos, oob_sample_counter, oob_index_counter);
 
-		printf("[%5x] Index block: pos:%08x sample_counter:%08x index_counter:%08x\n", stream_pos, oob_stream_pos, oob_sample_counter, oob_index_counter);
+		printf("[%5x] Index block: pos:%08x sample_counter:%08x index_counter:%08x\n", *stream_pos, oob_stream_pos, oob_sample_counter, oob_index_counter);
 		break;
 	}
 	case 0x03: {
@@ -222,11 +219,11 @@ int parse_oob(FILE *f, struct track *track)
 			return 1;
 		}
 
-		printf("[%5x] Stream end: pos:%08x result_code:%08x\n", stream_pos, oob_stream_pos, oob_result_code);
+		printf("[%5x] Stream end: pos:%08x result_code:%08x\n", *stream_pos, oob_stream_pos, oob_result_code);
 		break;
 	}
 	case 0x04: {
-		parse_kfinfo(f, track);
+		parse_kfinfo(f, track, *stream_pos);
 		break;
 	}
 	case 0x0d: {
@@ -238,7 +235,7 @@ int parse_oob(FILE *f, struct track *track)
 		rc = fread(&tmp, 1, 1, f);
 		if (rc < 1 || tmp != 0x0d) { return 1; }
 
-		printf("[%5x] EOF\n", stream_pos);
+		printf("[%5x] EOF\n", *stream_pos);
 		break;
 	}
 	default: {
@@ -253,6 +250,7 @@ int parse_oob(FILE *f, struct track *track)
 int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 {
 	FILE *input;
+	uint32_t stream_pos = 0;
 
 	input = fopen(fn, "r");
 	if (input == NULL) {
@@ -263,8 +261,6 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 	track->master_clock = ((18432000 * 73) / 14.0) / 2.0;
 	track->sample_clock = track->master_clock / 2;
 	track->index_clock  = track->master_clock / 16;
-
-	stream_pos = 0;
 
 	track->side  = side;
 	track->track = track_num;
@@ -301,7 +297,7 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 		case 0x05:
 		case 0x06:
 		case 0x07: {
-			parse_flux2(input, track, val);
+			parse_flux2(input, track, val, stream_pos);
 			stream_pos += 2;
 			break;
 		}
@@ -333,12 +329,12 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 			break;
 		}
 		case 0x0c: {
-			parse_flux3(input, track);
+			parse_flux3(input, track, stream_pos);
 			stream_pos += 3;
 			break;
 		}
 		case 0x0d: {
-			parse_oob(input, track);
+			parse_oob(input, track, &stream_pos);
 			break;
 		}
 		default: {
