@@ -396,6 +396,7 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 	}
 
 	// parse whole track
+	int error_count = 0;
 	while (j < track->flux_array_idx && track->flux_array[j].stream_pos < next_index) {
 //		printf("Flux: %u %u %u %u %u %0.8f\n", 
 //			track->side, track->track,
@@ -407,11 +408,12 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 		double flux_us = track->flux_array[j].flux_val / track->sample_clock;
 		rc = test_flux_timing(flux_us);
 		if (rc) {
-			printf("[TRACK:%02u, PASS:%u, POS:%x] Out of band? %.13f\n", track->track, pass, track->flux_array[j].stream_pos, flux_us);
+			//printf("[TRACK:%02u, PASS:%u, POS:%x] Out of band? %.13f\n", track->track, pass, track->flux_array[j].stream_pos, flux_us);
+			error_count++;
 		}
 
-		*flux_sum   += track->flux_array[j].flux_val;
-		flux_count += 1;
+		*flux_sum += track->flux_array[j].flux_val;
+		flux_count++;
 		j++;
 	}
 
@@ -421,6 +423,8 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 			next_index,
 			track->flux_array[j-1].stream_pos, next_index);
 	}
+
+	printf("[TRACK:%02u, PASS:%u] Error rate: %f%%\n", track->track, pass, error_count / (float)flux_count * 100);
 
 	return j;
 }
