@@ -24,15 +24,15 @@ void append_flux(struct track *track, uint16_t flux_val, uint32_t stream_pos)
 		uint32_t old_max = track->flux_array_max;
 		track->flux_array_max *= 2;
 
-		struct flux *tmp = (struct flux *)calloc(track->flux_array_max, sizeof(struct flux));
+		flux_t *tmp = (flux_t *)calloc(track->flux_array_max, sizeof(flux_t));
 		if (track->flux_array != NULL) {
-			memcpy(tmp, track->flux_array, old_max*sizeof(struct flux));
+			memcpy(tmp, track->flux_array, old_max*sizeof(flux_t));
 			free(track->flux_array);
 		}
 		track->flux_array = tmp;
 	}
 
-	track->flux_array[stream_pos].flux_val   = flux_val;
+	track->flux_array[stream_pos] = flux_val;
 
 	// idx becomes a marker for the last entry in the array
 	track->flux_array_idx = stream_pos;
@@ -359,7 +359,7 @@ void dump_stream(struct track *track)
 {
 	uint32_t i;
 	for (i = 0; i < track->flux_array_idx; i++) {
-		printf("FLUX:  stream_pos:%8x flux_val:%8x\n", i, track->flux_array[i].flux_val);
+		printf("FLUX:  stream_pos:%8x flux_val:%8x\n", i, track->flux_array[i]);
 	}
 	for (i = 0; i < track->indices_idx; i++) {
 		printf("INDEX: stream_pos:%8x sample_count:%8x index_counter:%8x\n",
@@ -400,18 +400,18 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 //		printf("Flux: %u %u %u %u %u %0.8f\n", 
 //			track->side, track->track,
 //			i, track->flux_array[j].stream_pos - index,
-//			track->flux_array[j].flux_val,
-//			track->flux_array[j].flux_val/track->sample_clock);
+//			track->flux_array[j],
+//			track->flux_array[j]/track->sample_clock);
 
 		int rc;
-		double flux_us = track->flux_array[j].flux_val / track->sample_clock;
+		double flux_us = track->flux_array[j] / track->sample_clock;
 		rc = test_flux_timing(flux_us);
 		if (rc) {
 			//printf("[TRACK:%02u, PASS:%u, POS:%x] Out of band? %.13f\n", track->track, pass, track->flux_array[j].stream_pos, flux_us);
 			error_count++;
 		}
 
-		*flux_sum += track->flux_array[j].flux_val;
+		*flux_sum += track->flux_array[j];
 		flux_count++;
 		j++;
 	}

@@ -9,9 +9,7 @@ struct index {
 	uint32_t index_counter;
 };
 
-struct flux {
-	uint16_t flux_val;
-};
+typedef uint16_t flux_t;
 
 struct track {
 	double   master_clock;
@@ -24,7 +22,7 @@ struct track {
 	uint8_t track;
 
 	struct index *indices;
-	struct flux  *flux_array;
+	uint16_t     *flux_array;
 
 	uint32_t     indices_idx;
 	uint32_t     indices_max;

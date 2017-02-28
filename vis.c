@@ -127,15 +127,15 @@ void plot_track(struct track *track, struct colour *buffer, uint16_t width, uint
 
 //		printf("pos: %u start:%u end:%u angle:%f x:%f y:%f, x:%u y:%u, fx:%u\n",
 //			pos-start, start, end, (pos-start)*fraction,
-//			x, y, x_scaled, y_scaled, track->flux_array[pos].flux_val);
+//			x, y, x_scaled, y_scaled, track->flux_array[pos]);
 
-		if (track->flux_array[pos].flux_val/track->sample_clock > 0.0000075) {
+		if (track->flux_array[pos]/track->sample_clock > 0.0000075) {
 			buffer[y_scaled*width + x_scaled].r = 255;
 		}
-		if (track->flux_array[pos].flux_val/track->sample_clock > 0.0000055) {
+		if (track->flux_array[pos]/track->sample_clock > 0.0000055) {
 			buffer[y_scaled*width + x_scaled].g = 255;
 		}
-		if (track->flux_array[pos].flux_val/track->sample_clock > 0.0000035) {
+		if (track->flux_array[pos]/track->sample_clock > 0.0000035) {
 			buffer[y_scaled*width + x_scaled].b = 255;
 		}
 		
