@@ -11,7 +11,6 @@ struct index {
 
 struct flux {
 	uint16_t flux_val;
-	uint32_t stream_pos;
 };
 
 struct track {

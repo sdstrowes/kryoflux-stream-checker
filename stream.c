@@ -20,7 +20,7 @@ void append_index(struct track *track, uint32_t stream_pos, uint32_t sample_coun
 
 void append_flux(struct track *track, uint16_t flux_val, uint32_t stream_pos)
 {
-	if (track->flux_array_idx >= track->flux_array_max - 1) {
+	if (stream_pos >= track->flux_array_max - 1) {
 		uint32_t old_max = track->flux_array_max;
 		track->flux_array_max *= 2;
 
@@ -32,9 +32,10 @@ void append_flux(struct track *track, uint16_t flux_val, uint32_t stream_pos)
 		track->flux_array = tmp;
 	}
 
-	track->flux_array[track->flux_array_idx].flux_val   = flux_val;
-	track->flux_array[track->flux_array_idx].stream_pos = stream_pos;
-	track->flux_array_idx++;
+	track->flux_array[stream_pos].flux_val   = flux_val;
+
+	// idx becomes a marker for the last entry in the array
+	track->flux_array_idx = stream_pos;
 }
 
 
@@ -358,13 +359,11 @@ void dump_stream(struct track *track)
 {
 	uint32_t i;
 	for (i = 0; i < track->flux_array_idx; i++) {
-		printf("FLUX:  stream_pos:%8x flux_val:%8x\n",
-			track->flux_array[i].stream_pos,
-			track->flux_array[i].flux_val);
+		printf("FLUX:  stream_pos:%8x flux_val:%8x\n", i, track->flux_array[i].flux_val);
 	}
 	for (i = 0; i < track->indices_idx; i++) {
 		printf("INDEX: stream_pos:%8x sample_count:%8x index_counter:%8x\n",
-			track->indices[i].stream_pos,
+			i,
 			track->indices[i].sample_counter,
 			track->indices[i].index_counter);
 	}
@@ -386,18 +385,18 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 	uint32_t flux_count = 0;
 
 	// Seek forward
-	while (j < track->flux_array_idx && track->flux_array[j].stream_pos < index) {
+	while (j < track->flux_array_idx && j < index) {
 		j++;
 	}
 
-	if (j < track->flux_array_idx && track->flux_array[j].stream_pos != index) {
+	if (j < track->flux_array_idx && j != index) {
 		printf("[TRACK:%02u, PASS:%u] WARNING: SEEK ERROR ON STREAM_POS %x", track->track, pass, index);
 		return j;
 	}
 
 	// parse whole track
 	int error_count = 0;
-	while (j < track->flux_array_idx && track->flux_array[j].stream_pos < next_index) {
+	while (j < track->flux_array_idx && j < next_index) {
 //		printf("Flux: %u %u %u %u %u %0.8f\n", 
 //			track->side, track->track,
 //			i, track->flux_array[j].stream_pos - index,
@@ -418,10 +417,8 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 	}
 
 	// Decoder must manually insert an empty flux at the end.
-	if (track->flux_array[j].stream_pos != next_index) {
-		printf("[%5x] NOT FOUND, AT END? %x %x\n",
-			next_index,
-			track->flux_array[j-1].stream_pos, next_index);
+	if (j != next_index) {
+		printf("[%5x] NOT FOUND, AT END? %x %x\n", next_index, j-1, next_index);
 	}
 
 	printf("[TRACK:%02u, PASS:%u] Error rate: %f%%\n", track->track, pass, error_count / (float)flux_count * 100);
