@@ -370,7 +370,18 @@ void dump_stream(struct track *track)
 	}
 }
 
-int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint32_t i, uint32_t j, uint32_t *flux_sum)
+int test_flux_timing(double flux_us)
+{
+	if (	(flux_us > 0.0000035 && flux_us < 0.0000045) ||
+		(flux_us > 0.0000055 && flux_us < 0.0000065) ||
+		(flux_us > 0.0000075 && flux_us < 0.0000085) ) {
+		return 0;
+	}
+
+	return 1;
+}
+
+int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint32_t pass, uint32_t j, uint32_t *flux_sum)
 {
 	uint32_t flux_count = 0;
 
@@ -380,17 +391,25 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 	}
 
 	if (j < track->flux_array_idx && track->flux_array[j].stream_pos != index) {
-		printf("WARNING: SEEK ERROR ON INDEX %u, %x", i, index);
+		printf("[TRACK:%02u, PASS:%u] WARNING: SEEK ERROR ON STREAM_POS %x", track->track, pass, index);
 		return j;
 	}
 
 	// parse whole track
 	while (j < track->flux_array_idx && track->flux_array[j].stream_pos < next_index) {
-		printf("Flux: %u %u %u %u %u %0.8f\n", 
-			track->side, track->track,
-			i, track->flux_array[j].stream_pos - index,
-			track->flux_array[j].flux_val,
-			track->flux_array[j].flux_val/track->sample_clock);
+//		printf("Flux: %u %u %u %u %u %0.8f\n", 
+//			track->side, track->track,
+//			i, track->flux_array[j].stream_pos - index,
+//			track->flux_array[j].flux_val,
+//			track->flux_array[j].flux_val/track->sample_clock);
+
+		int rc;
+		double flux_us = track->flux_array[j].flux_val / track->sample_clock;
+		rc = test_flux_timing(flux_us);
+		if (rc) {
+			printf("[TRACK:%02u, PASS:%u, POS:%x] Out of band? %.13f\n", track->track, pass, track->flux_array[j].stream_pos, flux_us);
+		}
+
 		*flux_sum   += track->flux_array[j].flux_val;
 		flux_count += 1;
 		j++;
@@ -403,31 +422,23 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 			track->flux_array[j-1].stream_pos, next_index);
 	}
 
-	printf("SUMMED? %u\n", *flux_sum);
-
-
-
-	printf("\n");
-
 	return j;
 }
 
 int decode_stream(struct track *track)
 {
-	uint32_t i = 0;
+	uint32_t pass = 0;
 	uint32_t j = 0;
 
-	uint32_t last_index_counter  = 0;
+//	uint32_t last_index_counter  = 0;
 	uint32_t last_sample_counter = 0;
 
-	printf("--- Decoding ---\n");
-
-	while (track->indices_idx && i < (track->indices_idx - 1)) {
+	while (track->indices_idx && pass < (track->indices_idx - 1)) {
 		uint32_t flux_sum       = 0;
-		uint32_t index_pos      = track->indices[i].stream_pos;
-		uint32_t next_index_pos = track->indices[i+1].stream_pos;
+		uint32_t index_pos      = track->indices[pass].stream_pos;
+		uint32_t next_index_pos = track->indices[pass+1].stream_pos;
 
-		j = decode_track(track, index_pos, next_index_pos, i, j, &flux_sum);
+		j = decode_track(track, index_pos, next_index_pos, pass, j, &flux_sum);
 
 		// INDEX TIME is the number of clock cycles since the last
 		// index occurred
@@ -438,28 +449,29 @@ int decode_stream(struct track *track)
 		// index->sample_counter: how far from beginning of prev flux trans
 		// index clock
 
-		printf("[%5x] IDX:%x SAMPLE CLOCK: %04x (%f)\n",
-			index_pos,
-			i,
-			track->indices[i].sample_counter,
-			track->indices[i].sample_counter / track->sample_clock);
+//		printf("[TRACK:%02x, PASS:%x] SAMPLE CLOCK: %04x (%f)\n",
+//			track->track,
+//			pass,
+//			track->indices[pass].sample_counter,
+//			track->indices[pass].sample_counter / track->sample_clock);
+//
+//		printf("[TRACK:%02x, PASS:%x] INDEX CLOCK:  %f (%f)\n",
+//			track->track,
+//			pass,
+//			track->indices[pass].index_counter/track->index_clock,
+//			pass ? (track->indices[pass].index_counter - last_index_counter)/track->index_clock : 0.0);
 
-		printf("[%5x] IDX:%x INDEX CLOCK:  %f (%f)\n",
-			index_pos,
-			i,
-			track->indices[i].index_counter/track->index_clock,
-			i ? (track->indices[i].index_counter - last_index_counter)/track->index_clock : 0.0);
-		uint32_t diff = flux_sum - last_sample_counter + track->indices[i].sample_counter;
-		printf("CALCED: %u - %u + %u == %u (%f)\n",
-			flux_sum, last_sample_counter, track->indices[i].sample_counter,
-			diff,
-			diff/track->sample_clock);
-		printf("RPM: %f\n", 60/(diff/track->sample_clock));
+		uint32_t diff = flux_sum - last_sample_counter + track->indices[pass].sample_counter;
+		printf("[TRACK:%02u, PASS:%u] TIME: %f; RPM: %f\n",
+			track->track,
+			pass,
+			diff/track->sample_clock,
+			60/(diff/track->sample_clock));
 
-		last_index_counter  = track->indices[i].index_counter;
-		last_sample_counter = track->indices[i].sample_counter;
+//		last_index_counter  = track->indices[pass].index_counter;
+		last_sample_counter = track->indices[pass].sample_counter;
 
-		i++;
+		pass++;
 	}
 
 	return 0;

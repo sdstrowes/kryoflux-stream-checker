@@ -68,11 +68,11 @@ int main(int argc, char *argv[])
 		}
 	}
 
-//	for (track_num = 0; track_num < TRACK_MAX; track_num++) {
-//		for (side = 0; side < SIDES; side++) {
-//			decode_stream(&track[side ? track_num + TRACK_MAX : track_num]);
-//		}
-//	}
+	for (track_num = 0; track_num < TRACK_MAX; track_num++) {
+		for (side = 0; side < SIDES; side++) {
+			decode_stream(&track[side ? track_num + TRACK_MAX : track_num]);
+		}
+	}
 
 
 //	for (track = 0; track < TRACK_MAX; track++) {
