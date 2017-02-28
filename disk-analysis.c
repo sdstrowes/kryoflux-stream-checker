@@ -81,13 +81,13 @@ int main(int argc, char *argv[])
 //		}
 //	}
 
-	for (track_num = 0; track_num < 82; track_num++) {
-		//for (side = 0; side < SIDES; side++) {
-			plot_track(&track[side ? track_num + TRACK_MAX : track_num], img_buffer, width, height);
-		//}
-	}
-
-	dump_stream_img(img_buffer, width, height);
+//	for (track_num = 0; track_num < 82; track_num++) {
+//		//for (side = 0; side < SIDES; side++) {
+//			plot_track(&track[side ? track_num + TRACK_MAX : track_num], img_buffer, width, height);
+//		//}
+//	}
+//
+//	dump_stream_img(img_buffer, width, height);
 
 	free(img_buffer); img_buffer = NULL;
 	for (track_num = 0; track_num < TRACK_MAX; track_num++) {
