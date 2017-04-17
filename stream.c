@@ -380,7 +380,7 @@ int test_flux_timing(double flux_us)
 	return 1;
 }
 
-int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint32_t pass, uint32_t *flux_sum)
+int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint32_t pass, uint32_t *flux_sum, struct stream_stats *stats)
 {
 	uint32_t flux_count = 0;
 
@@ -408,7 +408,9 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 			track->track, pass, next_index, index-1, next_index);
 	}
 
-	log_msg("[TRACK:%02u, PASS:%u] Error rate: %f%%", track->track, pass, error_count / (float)flux_count * 100);
+	if (pass < stats->pass_count_max) {
+		stats->error_rate[pass] = (error_count / (float)flux_count * 100);
+	}
 
 	return index;
 }
@@ -420,12 +422,16 @@ int decode_stream(struct track *track)
 	uint32_t last_index_counter  = 0;
 	uint32_t last_sample_counter = 0;
 
+	struct stream_stats stats;
+	stats.pass_count_max = PASS_COUNT_DEFAULT;
+	stats.error_rate = (double *)malloc(sizeof(double)*PASS_COUNT_DEFAULT);
+
 	while (track->indices_idx && pass < (track->indices_idx - 1)) {
 		uint32_t flux_sum       = 0;
 		uint32_t index_pos      = track->indices[pass].stream_pos;
 		uint32_t next_index_pos = track->indices[pass+1].stream_pos;
 
-		decode_track(track, index_pos, next_index_pos, pass, &flux_sum);
+		decode_track(track, index_pos, next_index_pos, pass, &flux_sum, &stats);
 
 		// INDEX TIME is the number of clock cycles since the last
 		// index occurred
@@ -460,6 +466,13 @@ int decode_stream(struct track *track)
 
 		pass++;
 	}
+
+	uint16_t i = 0;
+	double total = 0;
+	for ( ; i < pass; i++) {
+		total += stats.error_rate[i];
+	}
+	log_msg("[TRACK:%02u] %f average error rate", track->track, total);
 
 	return 0;
 }

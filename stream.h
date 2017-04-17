@@ -30,6 +30,12 @@ struct track {
 	uint32_t     flux_array_max;
 };
 
+#define PASS_COUNT_DEFAULT 5
+struct stream_stats {
+	uint16_t pass_count_max;
+	double *error_rate;
+};
+
 int  parse_stream(char *, struct track *, uint8_t side, uint8_t track);
 int  decode_stream(struct track *);
 void dump_stream(struct track *);
