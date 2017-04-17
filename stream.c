@@ -397,17 +397,8 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 	// parse whole track
 	int error_count = 0;
 	while (j < track->flux_array_idx && j < next_index) {
-//		printf("Flux: %u %u %u %u %u %0.8f\n", 
-//			track->side, track->track,
-//			i, track->flux_array[j].stream_pos - index,
-//			track->flux_array[j],
-//			track->flux_array[j]/track->sample_clock);
-
-		int rc;
 		double flux_us = track->flux_array[j] / track->sample_clock;
-		rc = test_flux_timing(flux_us);
-		if (rc) {
-			//printf("[TRACK:%02u, PASS:%u, POS:%x] Out of band? %.13f\n", track->track, pass, track->flux_array[j].stream_pos, flux_us);
+		if (test_flux_timing(flux_us)) {
 			error_count++;
 		}
 
@@ -418,10 +409,11 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 
 	// Decoder must manually insert an empty flux at the end.
 	if (j != next_index) {
-		log_err("[%5x] NOT FOUND, AT END? %x %x", next_index, j-1, next_index);
+		log_err("[TRACK:%02u, PASS:%u, next_index:%5x] NOT FOUND, AT END? %x %x",
+			track->track, pass, next_index, j-1, next_index);
 	}
 
-	log_dbg("[TRACK:%02u, PASS:%u] Error rate: %f%%", track->track, pass, error_count / (float)flux_count * 100);
+	log_msg("[TRACK:%02u, PASS:%u] Error rate: %f%%", track->track, pass, error_count / (float)flux_count * 100);
 
 	return j;
 }
