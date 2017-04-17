@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "disk-analysis-log.h"
 #include "stream.h"
 #include "vis.h"
 
@@ -31,7 +32,7 @@ int dump_stream_img(struct colour *buffer, uint16_t width, uint16_t height)
 	// Open file for writing (binary mode)
 	fp = fopen(filename, "wb");
 	if (fp == NULL) {
-		fprintf(stderr, "Could not open file %s for writing\n", filename);
+		log_err("Could not open file %s for writing\n", filename);
 		code = 1;
 		goto finalise;
 	}
@@ -39,7 +40,7 @@ int dump_stream_img(struct colour *buffer, uint16_t width, uint16_t height)
 	// Initialize write structure
 	png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 	if (png_ptr == NULL) {
-		fprintf(stderr, "Could not allocate write struct\n");
+		log_err("Could not allocate write struct\n");
 		code = 1;
 		goto finalise;
 	}
@@ -47,14 +48,14 @@ int dump_stream_img(struct colour *buffer, uint16_t width, uint16_t height)
 	// Initialize info structure
 	info_ptr = png_create_info_struct(png_ptr);
 	if (info_ptr == NULL) {
-		fprintf(stderr, "Could not allocate info struct\n");
+		log_err("Could not allocate info struct\n");
 		code = 1;
 		goto finalise;
 	}
 
 	// Setup Exception handling
 	if (setjmp(png_jmpbuf(png_ptr))) {
-		fprintf(stderr, "Error during png creation\n");
+		log_err("Error during png creation\n");
 		code = 1;
 		goto finalise;
 	}
