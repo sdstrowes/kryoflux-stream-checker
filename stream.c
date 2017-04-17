@@ -380,16 +380,12 @@ int test_flux_timing(double flux_us)
 	return 1;
 }
 
-int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint32_t pass, uint32_t j, uint32_t *flux_sum)
+int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint32_t pass, uint32_t *flux_sum)
 {
+	uint32_t j = index;
 	uint32_t flux_count = 0;
 
-	// Seek forward
-	while (j < track->flux_array_idx && j < index) {
-		j++;
-	}
-
-	if (j < track->flux_array_idx && j != index) {
+	if (j >= track->flux_array_idx) {
 		log_dbg("[TRACK:%02u, PASS:%u] WARNING: SEEK ERROR ON STREAM_POS %x", track->track, pass, index);
 		return j;
 	}
@@ -421,7 +417,6 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 int decode_stream(struct track *track)
 {
 	uint32_t pass = 0;
-	uint32_t j = 0;
 
 	uint32_t last_index_counter  = 0;
 	uint32_t last_sample_counter = 0;
@@ -431,7 +426,7 @@ int decode_stream(struct track *track)
 		uint32_t index_pos      = track->indices[pass].stream_pos;
 		uint32_t next_index_pos = track->indices[pass+1].stream_pos;
 
-		j = decode_track(track, index_pos, next_index_pos, pass, j, &flux_sum);
+		decode_track(track, index_pos, next_index_pos, pass, &flux_sum);
 
 		// INDEX TIME is the number of clock cycles since the last
 		// index occurred
