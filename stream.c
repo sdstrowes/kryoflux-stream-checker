@@ -382,36 +382,35 @@ int test_flux_timing(double flux_us)
 
 int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint32_t pass, uint32_t *flux_sum)
 {
-	uint32_t j = index;
 	uint32_t flux_count = 0;
 
-	if (j >= track->flux_array_idx) {
-		log_dbg("[TRACK:%02u, PASS:%u] WARNING: SEEK ERROR ON STREAM_POS %x", track->track, pass, index);
-		return j;
+	if (index >= track->flux_array_idx) {
+		log_err("[TRACK:%02u, PASS:%u] WARNING: SEEK ERROR ON STREAM_POS %x", track->track, pass, index);
+		return index;
 	}
 
 	// parse whole track
 	int error_count = 0;
-	while (j < track->flux_array_idx && j < next_index) {
-		double flux_us = track->flux_array[j] / track->sample_clock;
+	while (index < next_index && index < track->flux_array_idx) {
+		double flux_us = track->flux_array[index] / track->sample_clock;
 		if (test_flux_timing(flux_us)) {
 			error_count++;
 		}
 
-		*flux_sum += track->flux_array[j];
+		*flux_sum += track->flux_array[index];
 		flux_count++;
-		j++;
+		index++;
 	}
 
 	// Decoder must manually insert an empty flux at the end.
-	if (j != next_index) {
+	if (index != next_index) {
 		log_err("[TRACK:%02u, PASS:%u, next_index:%5x] NOT FOUND, AT END? %x %x",
-			track->track, pass, next_index, j-1, next_index);
+			track->track, pass, next_index, index-1, next_index);
 	}
 
 	log_msg("[TRACK:%02u, PASS:%u] Error rate: %f%%", track->track, pass, error_count / (float)flux_count * 100);
 
-	return j;
+	return index;
 }
 
 int decode_stream(struct track *track)
