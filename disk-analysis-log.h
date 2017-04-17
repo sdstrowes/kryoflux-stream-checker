@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define FILE (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
 void log_init(const char *id, int debug);
 
@@ -16,13 +16,13 @@ int _log_msg (const char *file, const char * func, int line, char *msg);
 int _log_err (const char *file, const char * func, int line, char *msg);
 
 #define log_info(...) \
-	_log_info(FILE, __func__, __LINE__, _log_msg_fmt(__VA_ARGS__))
+	_log_info(__FILENAME__, __func__, __LINE__, _log_msg_fmt(__VA_ARGS__))
 
 #define log_msg(...) \
-	_log_msg(FILE, __func__, __LINE__, _log_msg_fmt(__VA_ARGS__))
+	_log_msg(__FILENAME__, __func__, __LINE__, _log_msg_fmt(__VA_ARGS__))
 
 #define log_err(...) \
-	_log_err(FILE, __func__, __LINE__, _log_msg_fmt(__VA_ARGS__))
+	_log_err(__FILENAME__, __func__, __LINE__, _log_msg_fmt(__VA_ARGS__))
 
 #endif
 
