@@ -11,15 +11,15 @@ void log_init(const char *id, int debug);
 char *_log_msg_fmt(const char *format, ...)
 	__attribute__((format(printf, 1, 2)));
 
-int _log_info(const char *file, const char * func, int line, char *msg);
-int _log_msg (const char *file, const char * func, int line, char *msg);
-int _log_err (const char *file, const char * func, int line, char *msg);
-
-#define log_info(...) \
-	_log_info(__FILENAME__, __func__, __LINE__, _log_msg_fmt(__VA_ARGS__))
+int _log_msg(const char *file, const char * func, int line, char *msg);
+int _log_dbg(const char *file, const char * func, int line, char *msg);
+int _log_err(const char *file, const char * func, int line, char *msg);
 
 #define log_msg(...) \
 	_log_msg(__FILENAME__, __func__, __LINE__, _log_msg_fmt(__VA_ARGS__))
+
+#define log_dbg(...) \
+	_log_dbg(__FILENAME__, __func__, __LINE__, _log_msg_fmt(__VA_ARGS__))
 
 #define log_err(...) \
 	_log_err(__FILENAME__, __func__, __LINE__, _log_msg_fmt(__VA_ARGS__))

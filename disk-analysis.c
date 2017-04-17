@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "vis.h"
@@ -27,9 +28,11 @@ int main(int argc, char *argv[])
 	uint16_t width  = 4200;
 	uint16_t height = 4200;
 
+	log_init("", LOG_INFO);
+
 	img_buffer = (struct colour *) malloc(width * height * sizeof(struct colour));
 	if (img_buffer == NULL) {
-		log_err("Could not create image buffer\n");
+		log_err("Could not create image buffer");
 		return -1;
 	}
 	memset(img_buffer, 0, width * height * sizeof(struct colour));
@@ -37,7 +40,7 @@ int main(int argc, char *argv[])
 	struct track *track;
 	track = (struct track *)malloc(sizeof(struct track)*TRACK_MAX*SIDES);
 	if (track == NULL) {
-		log_err("Could not create track buffer\n");
+		log_err("Could not create track buffer");
 		return -1;
 	}
 	memset(track, 0, sizeof(struct track)*TRACK_MAX*SIDES);
@@ -64,7 +67,7 @@ int main(int argc, char *argv[])
 		for (side = 0; side < SIDES; side++) {
 			fn = (char *)malloc(strlen(fn_prefix) + 8 + 1);
 			sprintf(fn, "%s%02u.%u.raw", fn_prefix, track_num, side);
-			log_msg("--> %s\n", fn);
+			log_msg("--> %s", fn);
 			parse_stream(fn, &track[side ? track_num + TRACK_MAX : track_num], side, track_num);
 			free(fn);
 		}

@@ -96,7 +96,7 @@ int parse_kfinfo(FILE *f, struct track *track, uint32_t stream_pos)
 
 	rc = sscanf(str, "name=KryoFlux DiskSystem, version=2.20s, date=Jan  8 2015, time=13:49:26, hwid=1, hwrv=1, sck=%lf, ick=%lf", &track->sample_clock, &track->index_clock);
 
-	printf("[%5x] KFINFO: '%s'\n", stream_pos, str);
+	log_dbg("[%5x] KFINFO: '%s'", stream_pos, str);
 
 	free(str);
 
@@ -123,7 +123,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		rc = fread(&tmp, 1, 1, f);
 		if (rc < 1 || tmp != 0x00) { return 1; }
 
-		log_err("Invalid block at pos %x\n", *stream_pos);
+		log_err("Invalid block at pos %x", *stream_pos);
 		break;
 	}
 	case 0x01: {
@@ -147,13 +147,13 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		}
 
 		if (*stream_pos != oob_stream_pos) {
-			printf("[%5x] Stream Info: pos:%08x; transfer time:%4ums\n", *stream_pos, oob_stream_pos, oob_transfer_time);
-			printf("WARNING: stream_pos:%06x does not match oob:%06x; resetting\n",
+			log_dbg("[%5x] Stream Info: pos:%08x; transfer time:%4ums", *stream_pos, oob_stream_pos, oob_transfer_time);
+			log_err("WARNING: stream_pos:%06x does not match oob:%06x; resetting",
 				*stream_pos, oob_stream_pos);
 			*stream_pos = oob_stream_pos;
 		}
 		else {
-			printf("[%5x] Stream Info: transfer time:%4ums\n", *stream_pos, oob_transfer_time);
+			log_dbg("[%5x] Stream Info: transfer time:%4ums", *stream_pos, oob_transfer_time);
 		}
 
 		break;
@@ -170,7 +170,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		}
 
 		if (size != 0x000c) {
-			log_err("Error parsing index block: size %04x\n", size);
+			log_err("Error parsing index block: size %04x", size);
 			return 1;
 		}
 
@@ -191,7 +191,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 
 		append_index(track, oob_stream_pos, oob_sample_counter, oob_index_counter);
 
-		printf("[%5x] Index block: pos:%08x sample_counter:%08x index_counter:%08x\n", *stream_pos, oob_stream_pos, oob_sample_counter, oob_index_counter);
+		log_dbg("[%5x] Index block: pos:%08x sample_counter:%08x index_counter:%08x", *stream_pos, oob_stream_pos, oob_sample_counter, oob_index_counter);
 		break;
 	}
 	case 0x03: {
@@ -205,7 +205,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		}
 
 		if (size != 0x0008) {
-			log_err("Error parsing index block: size %04x\n", size);
+			log_err("Error parsing index block: size %04x", size);
 			return 1;
 		}
 
@@ -219,7 +219,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 			return 1;
 		}
 
-		printf("[%5x] Stream end: pos:%08x result_code:%08x\n", *stream_pos, oob_stream_pos, oob_result_code);
+		log_dbg("[%5x] Stream end: pos:%08x result_code:%08x", *stream_pos, oob_stream_pos, oob_result_code);
 		break;
 	}
 	case 0x04: {
@@ -235,11 +235,11 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		rc = fread(&tmp, 1, 1, f);
 		if (rc < 1 || tmp != 0x0d) { return 1; }
 
-		printf("[%5x] EOF\n", *stream_pos);
+		log_dbg("[%5x] EOF", *stream_pos);
 		break;
 	}
 	default: {
-		log_err("Unknown OOB type %x\n", val);
+		log_err("Unknown OOB type %x", val);
 		break;
 	}
 	}
@@ -254,7 +254,7 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 
 	input = fopen(fn, "r");
 	if (input == NULL) {
-		log_err("Can't open file %s\n", fn);
+		log_err("Can't open file %s", fn);
 		return 1;
 	}
 
@@ -274,7 +274,7 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 	track->flux_array = NULL;
 
 
-	printf("CLOCKS: %.10f %.10f %.10f\n",
+	log_dbg("CLOCKS: %.10f %.10f %.10f",
 		track->master_clock, track->sample_clock, track->index_clock);
 
 
@@ -311,20 +311,20 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 		case 0x09: {
 			stream_pos += 2;
 			rc = fread(&val, 1, 1, input);
-			if (rc < 1) { log_err("Failed read at pos %u\n", pos); break; }
+			if (rc < 1) { log_err("Failed read at pos %u", pos); break; }
 			break;
 		}
 		// three-byte no-op
 		case 0x0a: {
 			stream_pos += 3;
 			rc = fread(&val, 1, 1, input);
-			if (rc < 1) { log_err("Failed read at pos %u\n", pos); break; }
+			if (rc < 1) { log_err("Failed read at pos %u", pos); break; }
 			rc = fread(&val, 1, 1, input);
-			if (rc < 1) { log_err("Failed read at pos %u\n", pos); break; }
+			if (rc < 1) { log_err("Failed read at pos %u", pos); break; }
 			break;
 		}
 		case 0x0b: {
-			printf("ALERT: next flux block should be += 0x10000\n");
+			log_dbg("ALERT: next flux block should be += 0x10000");
 			stream_pos += 1;
 			break;
 		}
@@ -342,7 +342,7 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 				append_flux(track, val, stream_pos);
 			}
 			else {
-				printf("ERROR: Unknown block type %x\n", val);
+				log_err("Error: Unknown block type %x", val);
 			}
 			stream_pos += 1;
 		}
@@ -359,10 +359,10 @@ void dump_stream(struct track *track)
 {
 	uint32_t i;
 	for (i = 0; i < track->flux_array_idx; i++) {
-		printf("FLUX:  stream_pos:%8x flux_val:%8x\n", i, track->flux_array[i]);
+		log_dbg("FLUX:  stream_pos:%8x flux_val:%8x", i, track->flux_array[i]);
 	}
 	for (i = 0; i < track->indices_idx; i++) {
-		printf("INDEX: stream_pos:%8x sample_count:%8x index_counter:%8x\n",
+		log_dbg("INDEX: stream_pos:%8x sample_count:%8x index_counter:%8x",
 			i,
 			track->indices[i].sample_counter,
 			track->indices[i].index_counter);
@@ -390,7 +390,7 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 	}
 
 	if (j < track->flux_array_idx && j != index) {
-		printf("[TRACK:%02u, PASS:%u] WARNING: SEEK ERROR ON STREAM_POS %x", track->track, pass, index);
+		log_dbg("[TRACK:%02u, PASS:%u] WARNING: SEEK ERROR ON STREAM_POS %x", track->track, pass, index);
 		return j;
 	}
 
@@ -418,10 +418,10 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 
 	// Decoder must manually insert an empty flux at the end.
 	if (j != next_index) {
-		printf("[%5x] NOT FOUND, AT END? %x %x\n", next_index, j-1, next_index);
+		log_err("[%5x] NOT FOUND, AT END? %x %x", next_index, j-1, next_index);
 	}
 
-	printf("[TRACK:%02u, PASS:%u] Error rate: %f%%\n", track->track, pass, error_count / (float)flux_count * 100);
+	log_dbg("[TRACK:%02u, PASS:%u] Error rate: %f%%", track->track, pass, error_count / (float)flux_count * 100);
 
 	return j;
 }
@@ -463,7 +463,7 @@ int decode_stream(struct track *track)
 //			pass ? (track->indices[pass].index_counter - last_index_counter)/track->index_clock : 0.0);
 
 		uint32_t diff = flux_sum - last_sample_counter + track->indices[pass].sample_counter;
-		printf("[TRACK:%02u, PASS:%u] TIME: %f; RPM: %f\n",
+		log_dbg("[TRACK:%02u, PASS:%u] TIME: %f; RPM: %f",
 			track->track,
 			pass,
 			diff/track->sample_clock,
