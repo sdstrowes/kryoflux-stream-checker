@@ -423,7 +423,7 @@ int decode_stream(struct track *track)
 	uint32_t pass = 0;
 	uint32_t j = 0;
 
-//	uint32_t last_index_counter  = 0;
+	uint32_t last_index_counter  = 0;
 	uint32_t last_sample_counter = 0;
 
 	while (track->indices_idx && pass < (track->indices_idx - 1)) {
@@ -442,17 +442,17 @@ int decode_stream(struct track *track)
 		// index->sample_counter: how far from beginning of prev flux trans
 		// index clock
 
-//		printf("[TRACK:%02x, PASS:%x] SAMPLE CLOCK: %04x (%f)\n",
-//			track->track,
-//			pass,
-//			track->indices[pass].sample_counter,
-//			track->indices[pass].sample_counter / track->sample_clock);
-//
-//		printf("[TRACK:%02x, PASS:%x] INDEX CLOCK:  %f (%f)\n",
-//			track->track,
-//			pass,
-//			track->indices[pass].index_counter/track->index_clock,
-//			pass ? (track->indices[pass].index_counter - last_index_counter)/track->index_clock : 0.0);
+		log_dbg("[TRACK:%02x, PASS:%x] SAMPLE CLOCK: %04x (%f)\n",
+			track->track,
+			pass,
+			track->indices[pass].sample_counter,
+			track->indices[pass].sample_counter / track->sample_clock);
+
+		log_dbg("[TRACK:%02x, PASS:%x] INDEX CLOCK:  %f (%f)\n",
+			track->track,
+			pass,
+			track->indices[pass].index_counter/track->index_clock,
+			pass ? (track->indices[pass].index_counter - last_index_counter)/track->index_clock : 0.0);
 
 		uint32_t diff = flux_sum - last_sample_counter + track->indices[pass].sample_counter;
 		log_dbg("[TRACK:%02u, PASS:%u] TIME: %f; RPM: %f",
@@ -461,7 +461,7 @@ int decode_stream(struct track *track)
 			diff/track->sample_clock,
 			60/(diff/track->sample_clock));
 
-//		last_index_counter  = track->indices[pass].index_counter;
+		last_index_counter  = track->indices[pass].index_counter;
 		last_sample_counter = track->indices[pass].sample_counter;
 
 		pass++;

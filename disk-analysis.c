@@ -28,7 +28,22 @@ int main(int argc, char *argv[])
 	uint16_t width  = 4200;
 	uint16_t height = 4200;
 
-	log_init("", LOG_INFO);
+	int log_level = LOG_INFO;
+
+	opterr = 0;	// silence error output on bad options
+	while ((c = getopt (argc, argv, "dn:")) != -1) {
+		switch (c) {
+		case 'n': {
+			fn_prefix = optarg;
+			break;
+		}
+		case 'd': {
+			log_level = LOG_DEBUG;
+		}
+		}
+	}
+
+	log_init("", log_level);
 
 	img_buffer = (struct colour *) malloc(width * height * sizeof(struct colour));
 	if (img_buffer == NULL) {
@@ -45,15 +60,6 @@ int main(int argc, char *argv[])
 	}
 	memset(track, 0, sizeof(struct track)*TRACK_MAX*SIDES);
 
-	opterr = 0;	// silence error output on bad options
-	while ((c = getopt (argc, argv, "n:")) != -1) {
-		switch (c) {
-		case 'n': {
-			fn_prefix = optarg;
-			break;
-		}
-		}
-	}
 
 	if (fn_prefix == NULL) {
 		print_help(argv[0]);
