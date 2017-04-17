@@ -24,9 +24,6 @@ int main(int argc, char *argv[])
 {
 	char c;
 	char *fn_prefix = NULL;
-	struct colour *img_buffer;
-	uint16_t width  = 4200;
-	uint16_t height = 4200;
 
 	int log_level = LOG_INFO;
 
@@ -44,13 +41,6 @@ int main(int argc, char *argv[])
 	}
 
 	log_init("", log_level);
-
-	img_buffer = (struct colour *) malloc(width * height * sizeof(struct colour));
-	if (img_buffer == NULL) {
-		log_err("Could not create image buffer");
-		return -1;
-	}
-	memset(img_buffer, 0, width * height * sizeof(struct colour));
 
 	struct track *track;
 	track = (struct track *)malloc(sizeof(struct track)*TRACK_MAX*SIDES);
@@ -85,6 +75,16 @@ int main(int argc, char *argv[])
 		}
 	}
 
+//	struct colour *img_buffer;
+//	uint16_t width  = 4200;
+//	uint16_t height = 4200;
+
+//	img_buffer = (struct colour *) malloc(width * height * sizeof(struct colour));
+//	if (img_buffer == NULL) {
+//		log_err("Could not create image buffer");
+//		return -1;
+//	}
+//	memset(img_buffer, 0, width * height * sizeof(struct colour));
 
 //	for (track = 0; track < TRACK_MAX; track++) {
 //		for (side = 0; side < SIDES; side++) {
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 //
 //	dump_stream_img(img_buffer, width, height);
 
-	free(img_buffer); img_buffer = NULL;
+//	free(img_buffer); img_buffer = NULL;
 	for (track_num = 0; track_num < TRACK_MAX; track_num++) {
 		for (side = 0; side < SIDES; side++) {
 			free_stream(&track[side ? track_num + TRACK_MAX : track_num]);
