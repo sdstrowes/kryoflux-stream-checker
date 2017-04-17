@@ -41,6 +41,7 @@ int main(int argc, char *argv[])
 	}
 	memset(track, 0, sizeof(struct track)*TRACK_MAX*SIDES);
 
+	opterr = 0;	// silence error output on bad options
 	while ((c = getopt (argc, argv, "n:")) != -1) {
 		switch (c) {
 		case 'n': {
