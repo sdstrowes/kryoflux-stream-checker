@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "stream.h"
-
+#include "disk-analysis-log.h"
 
 void append_index(struct track *track, uint32_t stream_pos, uint32_t sample_counter, uint32_t index_counter)
 {
@@ -123,7 +123,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		rc = fread(&tmp, 1, 1, f);
 		if (rc < 1 || tmp != 0x00) { return 1; }
 
-		fprintf(stderr, "Invalid block at pos %x\n", *stream_pos);
+		log_err("Invalid block at pos %x\n", *stream_pos);
 		break;
 	}
 	case 0x01: {
@@ -170,7 +170,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		}
 
 		if (size != 0x000c) {
-			fprintf(stderr, "Error parsing index block: size %04x\n", size);
+			log_err("Error parsing index block: size %04x\n", size);
 			return 1;
 		}
 
@@ -205,7 +205,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		}
 
 		if (size != 0x0008) {
-			fprintf(stderr, "Error parsing index block: size %04x\n", size);
+			log_err("Error parsing index block: size %04x\n", size);
 			return 1;
 		}
 
@@ -239,7 +239,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		break;
 	}
 	default: {
-		fprintf(stderr, "ruh roh\n");
+		log_err("Unknown OOB type %x\n", val);
 		break;
 	}
 	}
@@ -254,7 +254,7 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 
 	input = fopen(fn, "r");
 	if (input == NULL) {
-		fprintf(stderr, "Can't open file %s\n", fn);
+		log_err("Can't open file %s\n", fn);
 		return 1;
 	}
 
@@ -311,16 +311,16 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 		case 0x09: {
 			stream_pos += 2;
 			rc = fread(&val, 1, 1, input);
-			if (rc < 1) { fprintf(stderr, "Failed read at pos %u\n", pos); break; }
+			if (rc < 1) { log_err("Failed read at pos %u\n", pos); break; }
 			break;
 		}
 		// three-byte no-op
 		case 0x0a: {
 			stream_pos += 3;
 			rc = fread(&val, 1, 1, input);
-			if (rc < 1) { fprintf(stderr, "Failed read at pos %u\n", pos); break; }
+			if (rc < 1) { log_err("Failed read at pos %u\n", pos); break; }
 			rc = fread(&val, 1, 1, input);
-			if (rc < 1) { fprintf(stderr, "Failed read at pos %u\n", pos); break; }
+			if (rc < 1) { log_err("Failed read at pos %u\n", pos); break; }
 			break;
 		}
 		case 0x0b: {

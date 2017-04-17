@@ -51,7 +51,7 @@ char *_log_msg_fmt(const char *fmt, ...)
 int _log_msg(const char *file, const char * func, int line, char *msg)
 {
 	char buf[BUF_LEN];
-	snprintf(buf, MAX_LEN, "[%8.8s: %04u,%.16s] %s", file, line, func, msg);
+	snprintf(buf, MAX_LEN, "[%16.16s: %04u,%.16s] %s", file, line, func, msg);
 	if (_log_func) {
 		_log_func(LOG_INFO, buf);
 	}
@@ -62,7 +62,7 @@ int _log_msg(const char *file, const char * func, int line, char *msg)
 int _log_err(const char *file, const char * func, int line, char *msg)
 {
 	char buf[BUF_LEN];
-	snprintf(buf, MAX_LEN, "[%8.8s: %04u,%.16s] %s", file, line, func, msg);
+	snprintf(buf, MAX_LEN, "[%16.16s: %04u,%.16s] %s", file, line, func, msg);
 	if (_log_func) {
 		_log_func(LOG_ERR, buf);
 	}
