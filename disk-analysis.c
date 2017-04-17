@@ -1,3 +1,4 @@
+#include <getopt.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -6,7 +7,7 @@
 
 #include "vis.h"
 #include "stream.h"
-
+#include "disk-analysis-log.h"
 
 #define TRACK_MAX 84
 #define SIDES      2
@@ -28,7 +29,7 @@ int main(int argc, char *argv[])
 
 	img_buffer = (struct colour *) malloc(width * height * sizeof(struct colour));
 	if (img_buffer == NULL) {
-		fprintf(stderr, "Could not create image buffer\n");
+		log_err("Could not create image buffer\n");
 		return -1;
 	}
 	memset(img_buffer, 0, width * height * sizeof(struct colour));
@@ -36,7 +37,7 @@ int main(int argc, char *argv[])
 	struct track *track;
 	track = (struct track *)malloc(sizeof(struct track)*TRACK_MAX*SIDES);
 	if (track == NULL) {
-		fprintf(stderr, "Could not create track buffer\n");
+		log_err("Could not create track buffer\n");
 		return -1;
 	}
 	memset(track, 0, sizeof(struct track)*TRACK_MAX*SIDES);
@@ -63,7 +64,7 @@ int main(int argc, char *argv[])
 		for (side = 0; side < SIDES; side++) {
 			fn = (char *)malloc(strlen(fn_prefix) + 8 + 1);
 			sprintf(fn, "%s%02u.%u.raw", fn_prefix, track_num, side);
-			printf("--> %s\n", fn);
+			log_msg("--> %s\n", fn);
 			parse_stream(fn, &track[side ? track_num + TRACK_MAX : track_num], side, track_num);
 			free(fn);
 		}
