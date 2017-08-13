@@ -10,8 +10,11 @@ struct colour {
         uint8_t b;
 };
 
-void plot_track(struct track *, struct colour *, uint16_t, uint16_t);
+void plot_track(FILE *svg_out, struct track *track);
 int  dump_stream_img(struct colour *, uint16_t, uint16_t);
+
+FILE * test_svg_out();
+void finalise_svg(FILE *);
 
 #endif
 

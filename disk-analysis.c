@@ -101,12 +101,23 @@ int main(int argc, char *argv[])
 //	dump_stream_img(img_buffer, width, height);
 
 //	free(img_buffer); img_buffer = NULL;
+	FILE *svg_out = test_svg_out();
+	//for (track_num = 0; track_num < TRACK_MAX; track_num++) {
+	for (track_num = 0; track_num < 82; track_num++) {
+		for (side = 0; side < SIDES; side++) {
+			plot_track(svg_out, &track[side ? track_num + TRACK_MAX : track_num]);
+		}
+	}
+	finalise_svg(svg_out);
+
 	for (track_num = 0; track_num < TRACK_MAX; track_num++) {
 		for (side = 0; side < SIDES; side++) {
 			free_stream(&track[side ? track_num + TRACK_MAX : track_num]);
 		}
 	}
 	free(track);
+
+
 
 	return 0;
 }
