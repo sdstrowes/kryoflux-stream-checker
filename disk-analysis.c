@@ -63,8 +63,13 @@ int main(int argc, char *argv[])
 		for (side = 0; side < SIDES; side++) {
 			fn = (char *)malloc(strlen(fn_prefix) + 8 + 1);
 			sprintf(fn, "%s%02u.%u.raw", fn_prefix, track_num, side);
-			log_msg("--> %s", fn);
-			parse_stream(fn, &track[side ? track_num + TRACK_MAX : track_num], side, track_num);
+			int rc = parse_stream(fn, &track[side ? track_num + TRACK_MAX : track_num], side, track_num);
+			if (!rc) {
+				log_dbg("Loaded %s", fn);
+			}
+			else {
+				log_dbg("Error reading %s", fn);
+			}
 			free(fn);
 		}
 	}

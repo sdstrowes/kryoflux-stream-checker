@@ -254,7 +254,6 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 
 	input = fopen(fn, "r");
 	if (input == NULL) {
-		log_err("Can't open file %s", fn);
 		return 1;
 	}
 
