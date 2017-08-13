@@ -348,7 +348,6 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 		}
 	}
 
-
 	fclose(input);
 
 	return 0;
