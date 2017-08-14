@@ -378,7 +378,7 @@ int test_flux_timing(double flux_us)
 	return 1;
 }
 
-int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint32_t pass, uint32_t *flux_sum, struct stream_stats *stats)
+int decode_pass(struct track *track, uint32_t index, uint32_t next_index, uint32_t pass, uint32_t *flux_sum, struct stream_stats *stats)
 {
 	uint32_t flux_count = 0;
 
@@ -413,7 +413,7 @@ int decode_track(struct track *track, uint32_t index, uint32_t next_index, uint3
 	return index;
 }
 
-int decode_stream(struct track *track)
+int decode_track(struct track *track)
 {
 	uint32_t pass = 0;
 
@@ -429,7 +429,7 @@ int decode_stream(struct track *track)
 		uint32_t index_pos      = track->indices[pass].stream_pos;
 		uint32_t next_index_pos = track->indices[pass+1].stream_pos;
 
-		decode_track(track, index_pos, next_index_pos, pass, &flux_sum, &stats);
+		decode_pass(track, index_pos, next_index_pos, pass, &flux_sum, &stats);
 
 		// INDEX TIME is the number of clock cycles since the last
 		// index occurred

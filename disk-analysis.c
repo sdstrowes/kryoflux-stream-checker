@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 	for (side = 0; side < SIDES; side++) {
 		struct track_data *track;
 		STAILQ_FOREACH(track, &disk.side[side], next) {
-			decode_stream(&track->t);
+			decode_track(&track->t);
 		}
 	}
 

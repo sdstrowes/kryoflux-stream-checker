@@ -43,7 +43,7 @@ struct stream_stats {
 };
 
 int  parse_stream(char *, struct track *, uint8_t side, uint8_t track);
-int  decode_stream(struct track *);
+int  decode_track(struct track *);
 void dump_stream(struct track *);
 void free_stream(struct track *);
 
