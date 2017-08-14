@@ -440,11 +440,10 @@ int decode_stream(struct track *track)
 		// index->sample_counter: how far from beginning of prev flux trans
 		// index clock
 
-		log_dbg("[TRACK:%02x, PASS:%x] SAMPLE CLOCK: %04x (%f)\n",
+		log_dbg("[TRACK:%02x, PASS:%x] SAMPLE CLOCK: %0.3fus\n",
 			track->track,
 			pass,
-			track->indices[pass].sample_counter,
-			track->indices[pass].sample_counter / track->sample_clock);
+			track->indices[pass].sample_counter / track->sample_clock * 1000 * 1000);
 
 		log_dbg("[TRACK:%02x, PASS:%x] INDEX CLOCK:  %f (%f)\n",
 			track->track,
