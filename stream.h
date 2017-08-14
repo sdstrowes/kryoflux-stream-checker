@@ -3,6 +3,12 @@
 #ifndef __stream_h__
 #define __stream_h__
 
+
+/* page 11:
+ * When an index signal is detected the information is not placed in the stream
+ * buffer but the position of the next flux reversal in the stream buffer is
+ * recorded as well as the value of the Sample Counter (time from previous flux
+ * reversal) and the Index Counter */
 struct index {
 	uint32_t stream_pos;
 	uint32_t sample_counter;
