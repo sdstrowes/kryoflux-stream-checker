@@ -424,21 +424,19 @@ int decode_track(struct track *track)
 	stats.pass_count_max = PASS_COUNT_DEFAULT;
 	stats.error_rate = (double *)malloc(sizeof(double)*PASS_COUNT_DEFAULT);
 
+	/* Method to calculate the time between two indices:
+	 * page 10: It can also be calculated by summing all the flux reversal
+	 * values that we recorded since the previous index, adding the Sample
+	 * Counter value at which the index was detected (see Sample Counter
+	 * field in Index Block) and subtracting the Sample Counter value of
+	 * the previous index.
+	 */
 	while (track->indices_idx && pass < (track->indices_idx - 1)) {
 		uint32_t flux_sum       = 0;
 		uint32_t index_pos      = track->indices[pass].stream_pos;
 		uint32_t next_index_pos = track->indices[pass+1].stream_pos;
 
 		decode_pass(track, index_pos, next_index_pos, pass, &flux_sum, &stats);
-
-		// INDEX TIME is the number of clock cycles since the last
-		// index occurred
-
-		// flux val
-		// stream pos
-		// index->stream_pos: next flux transition
-		// index->sample_counter: how far from beginning of prev flux trans
-		// index clock
 
 		log_dbg("[TRACK:%02x, PASS:%x] SAMPLE CLOCK: %0.3fus\n",
 			track->track,
@@ -452,10 +450,10 @@ int decode_track(struct track *track)
 			pass ? (track->indices[pass].index_counter - last_index_counter)/track->index_clock : 0.0);
 
 		uint32_t diff = flux_sum - last_sample_counter + track->indices[pass].sample_counter;
-		log_dbg("[TRACK:%02u, PASS:%u] TIME: %f; RPM: %f",
+		log_dbg("[TRACK:%02u, PASS:%u] Space between indices: %0.3fms; %0.3f RPM",
 			track->track,
 			pass,
-			diff/track->sample_clock,
+			diff/track->sample_clock * 1000,
 			60/(diff/track->sample_clock));
 
 		last_index_counter  = track->indices[pass].index_counter;
