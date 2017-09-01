@@ -383,27 +383,53 @@ int decode_pass(struct track *track, uint32_t index, uint32_t next_index, uint32
 	uint32_t flux_count = 0;
 
 	if (index >= track->flux_array_idx) {
-		log_err("[TRACK:%02u, PASS:%u] WARNING: SEEK ERROR ON STREAM_POS %x", track->track, pass, index);
+		log_err("[S:%x, T:%02u, PASS:%u] WARNING: SEEK ERROR ON STREAM_POS %x", track->side, track->track, pass, index);
 		return index;
 	}
 
 	// parse whole track
 	int error_count = 0;
+	int i = 0;
 	while (index < next_index && index < track->flux_array_idx) {
 		double flux_us = track->flux_array[index] / track->sample_clock;
 		if (test_flux_timing(flux_us)) {
 			error_count++;
 		}
 
+//		printf("PRP %0.2f\n", flux_us * 1000 * 1000);
+
+//		if (i == 0) {
+//			printf("FLUXES: POS: %05x:%05x, SIDE: %u, TRACK: %2u, PASS: %u: ", index, next_index, track->side, track->track, pass);
+//		}
+//		if (i < 10) {
+//			printf("%0.3f ", flux_us * 1000 * 1000);
+//			i++;
+//		}
+//		if (i == 10) {
+//			printf("\n");
+//			i++;
+//		}
+
 		*flux_sum += track->flux_array[index];
 		flux_count++;
 		index++;
+
+		/* double density is MFM encoding
+		 * That's basically:
+		 * 00: reversal    + no reversal
+		 * 01: no reversal + no reversal
+		 * 1:  no reversal + reversal
+		 * minimum measurable gap: ~0.2us since last reversal? between reversals?
+		 * "elapsed time between two flux reversals, or between a Flux reversal and an Index Signal."
+		 * valid combos:
+		 * - 
+		*/
 	}
 
 	// Decoder must manually insert an empty flux at the end.
 	if (index != next_index) {
-		log_err("[TRACK:%02u, PASS:%u, next_index:%5x] NOT FOUND, AT END? %x %x",
-			track->track, pass, next_index, index-1, next_index);
+		log_err("[S:%x, T:%02u, PASS:%u, next_index:%5x] NOT FOUND, AT END? %x %x",
+			track->side, track->track, pass, next_index, index-1, next_index);
 	}
 
 	if (pass < stats->pass_count_max) {
@@ -415,7 +441,7 @@ int decode_pass(struct track *track, uint32_t index, uint32_t next_index, uint32
 
 int decode_track(struct track *track)
 {
-	uint32_t pass = 0;
+	uint32_t pass;
 
 	uint32_t last_index_counter  = 0;
 	uint32_t last_sample_counter = 0;
@@ -424,6 +450,17 @@ int decode_track(struct track *track)
 	stats.pass_count_max = PASS_COUNT_DEFAULT;
 	stats.error_rate = (double *)malloc(sizeof(double)*PASS_COUNT_DEFAULT);
 
+	for (pass = 0; pass < track->indices_idx; pass++) {
+		log_dbg("[S:%u, T:%02u, PASS:%x] INDEX: %05x %0.3f [%0.3f:%0.3f:%0.3f] %x",
+			track->side, track->track, pass,
+			track->indices[pass].stream_pos,
+			track->indices[pass].sample_counter / track->sample_clock * 1000 * 1000,
+			track->flux_array[track->indices[pass].stream_pos-1] / track->sample_clock * 1000 * 1000,
+			track->flux_array[track->indices[pass].stream_pos]  / track->sample_clock * 1000 * 1000,
+			track->flux_array[track->indices[pass].stream_pos+1]  / track->sample_clock * 1000 * 1000,
+			track->indices[pass].index_counter);
+	}
+
 	/* Method to calculate the time between two indices:
 	 * page 10: It can also be calculated by summing all the flux reversal
 	 * values that we recorded since the previous index, adding the Sample
@@ -431,28 +468,27 @@ int decode_track(struct track *track)
 	 * field in Index Block) and subtracting the Sample Counter value of
 	 * the previous index.
 	 */
+	pass = 0;
 	while (track->indices_idx && pass < (track->indices_idx - 1)) {
 		uint32_t flux_sum       = 0;
 		uint32_t index_pos      = track->indices[pass].stream_pos;
 		uint32_t next_index_pos = track->indices[pass+1].stream_pos;
 
+
 		decode_pass(track, index_pos, next_index_pos, pass, &flux_sum, &stats);
 
-		log_dbg("[TRACK:%02x, PASS:%x] SAMPLE CLOCK: %0.3fus\n",
-			track->track,
-			pass,
+		log_dbg("[S:%x, T:%02u, PASS:%x] SAMPLE CLOCK: %0.3fus",
+			track->side, track->track, pass,
 			track->indices[pass].sample_counter / track->sample_clock * 1000 * 1000);
 
-		log_dbg("[TRACK:%02x, PASS:%x] INDEX CLOCK:  %f (%f)\n",
-			track->track,
-			pass,
+		log_dbg("[S:%x, T:%02u, PASS:%x] INDEX CLOCK:  %f (%f)",
+			track->side, track->track, pass,
 			track->indices[pass].index_counter/track->index_clock,
 			pass ? (track->indices[pass].index_counter - last_index_counter)/track->index_clock : 0.0);
 
 		uint32_t diff = flux_sum - last_sample_counter + track->indices[pass].sample_counter;
-		log_dbg("[TRACK:%02u, PASS:%u] Space between indices: %0.3fms; %0.3f RPM",
-			track->track,
-			pass,
+		log_dbg("[S:%x, T:%02u, PASS:%u] Space between indices: %0.3fms; %0.3f RPM",
+			track->side, track->track, pass,
 			diff/track->sample_clock * 1000,
 			60/(diff/track->sample_clock));
 
@@ -467,7 +503,7 @@ int decode_track(struct track *track)
 	for ( ; i < pass; i++) {
 		total += stats.error_rate[i];
 	}
-	log_msg("[TRACK:%02u] %f average error rate", track->track, total);
+	log_msg("[S:%x, T:%02u] %f average error rate", track->side, track->track, total);
 
 	return 0;
 }
