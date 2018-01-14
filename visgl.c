@@ -19,7 +19,7 @@ GLFWwindow* window;
 
 int glvis_init(struct gl_state *s)
 {
-	struct gl_state state = { 2048, 2048, 0, 0, 0, 0, 0 };
+	struct gl_state state = { 1080, 1080, 0, 0, 0, 0, 0 };
 
 	// Initialise GLFW
 	if( !glfwInit() ) {
@@ -113,7 +113,11 @@ int glvis_paint(struct gl_state *state, const vec3 *points_buffer, int points_bu
 	glBufferData(GL_ARRAY_BUFFER, color_buffer_size*sizeof(GLfloat)*3,  color_buffer,  GL_STATIC_DRAW);
 
 	glPointSize(8);
-	glLineWidth(8);
+
+	glEnable(GL_LINE_SMOOTH);
+	glEnable(GL_BLEND);
+	glDepthMask(false);
+	glLineWidth(10.0);
 
 	do{
 		// Clear the screen
@@ -163,7 +167,7 @@ int glvis_paint(struct gl_state *state, const vec3 *points_buffer, int points_bu
 		);
 
 		// Actually draw things
-		glDrawArrays(GL_POINTS, 0, points_buffer_size);
+		glDrawArrays(GL_LINE_STRIP, 0, points_buffer_size);
 
 		glDisableVertexAttribArray(0);
 		glDisableVertexAttribArray(1);
