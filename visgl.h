@@ -1,6 +1,7 @@
 #ifndef __VISGL_H__
 #define __VISGL_H__
 
+#include <cglm/vec3.h>
 #include <GLFW/glfw3.h>
 #include "stream.h"
 
@@ -20,8 +21,8 @@ struct gl_state
 
 int  glvis_init(struct gl_state *s);
 int  glvis_destroy(struct gl_state *s);
-void build_buffers(struct track *track, GLfloat **p, GLfloat **c, int *num, int *max);
-int  glvis_paint(struct gl_state *state, const GLfloat *points_buffer, int points_buffer_size, const GLfloat *color_buffer, int color_buffer_size);
+void build_buffers(struct track *track, vec3 **p, vec3 **c, int *num, int *max);
+int  glvis_paint(struct gl_state *state, const vec3 *points_buffer, int points_buffer_size, const vec3 *color_buffer, int color_buffer_size);
 
 #endif
 

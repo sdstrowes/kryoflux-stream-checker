@@ -102,20 +102,18 @@ int glvis_destroy(struct gl_state *state)
 	return 0;
 }
 
-int glvis_paint(struct gl_state *state, const GLfloat *points_buffer, int points_buffer_size, const GLfloat *color_buffer, int color_buffer_size)
+int glvis_paint(struct gl_state *state, const vec3 *points_buffer, int points_buffer_size, const vec3 *color_buffer, int color_buffer_size)
 {
 	glGenBuffers(1, &(state->vertexbuffer));
 	glBindBuffer(GL_ARRAY_BUFFER, state->vertexbuffer);
 	glBufferData(GL_ARRAY_BUFFER, points_buffer_size*sizeof(GLfloat)*3, points_buffer, GL_STATIC_DRAW);
 
-	glGenBuffers(1, &state->colorbuffer);
+	glGenBuffers(1, &(state->colorbuffer));
 	glBindBuffer(GL_ARRAY_BUFFER, state->colorbuffer);
 	glBufferData(GL_ARRAY_BUFFER, color_buffer_size*sizeof(GLfloat)*3,  color_buffer,  GL_STATIC_DRAW);
 
 	glPointSize(8);
 	glLineWidth(8);
-
-	printf("%0.2f, %0.2f, %0.2f\n", points_buffer[0], points_buffer[1], points_buffer[2]);
 
 	do{
 		// Clear the screen
@@ -188,8 +186,6 @@ double radius(int track)
 
         double radius_min = canvas_ctr / 4;
         double radius_max = canvas_ctr;
-
-	printf("t:%u RAD:%0.4f\n", track, (num_tracks - track) * ((radius_max - radius_min) / num_tracks) + radius_min);
 
         return (num_tracks - track) * ((radius_max - radius_min) / num_tracks) + radius_min;
 }
@@ -312,11 +308,10 @@ void calc_colour(double sample, struct colour *colour)
 
 
 
-void build_buffers(struct track *track, GLfloat **p, GLfloat **c, int *num, int *max)
+void build_buffers(struct track *track, vec3 **p, vec3 **c, int *num, int *max)
 {
-
-	GLfloat *points = *p;
-	GLfloat *colors = *c;
+	vec3 *points = *p;
+	vec3 *colors = *c;
 
 	if (track == NULL) {
 		return;
@@ -366,9 +361,8 @@ void build_buffers(struct track *track, GLfloat **p, GLfloat **c, int *num, int 
 
 
 		//printf("%s: Track %u; radius_min: %f, radius_max: %f\n", fn, track, radius_min, radius_max);
-		printf("Sample: %0.3f counter:%0.3f pos:%u\n", sample, pos_counter, pos);
-		printf("Drawing %.3f at (%.3f,%.3f) to (%.3f,%.3f), r:%.3f, t:%u\n", angle, x1, y1, x2, y2, r, track->track);
-
+		//printf("Sample: %0.3f counter:%0.3f pos:%u\n", sample, pos_counter, pos);
+		//printf("Drawing %.3f at (%.3f,%.3f) to (%.3f,%.3f), r:%.3f, t:%u\n", angle, x1, y1, x2, y2, r, track->track);
 
 		/* This is where the points are bundled into the buffer: each
 		 * point has x,y,z, and also r,g,b.
@@ -376,37 +370,22 @@ void build_buffers(struct track *track, GLfloat **p, GLfloat **c, int *num, int 
 		 * same time. */
 		if (*num >= *max) {
 			*max = *max + 1024;
-			*p = realloc(points, (*max)*sizeof(GLfloat)*3);
-			*c = realloc(colors, *max*sizeof(GLfloat));
+			*p = realloc(points, (*max)*sizeof(vec3));
+			*c = realloc(colors, (*max)*sizeof(vec3));
 			points = *p;
 			colors = *c;
 		}
-		colors[*num] = colour.r;
-		points[*num] = x2;
-		*num = *num + 1;
 
-		if (*num >= *max) {
-			*max = *max + 1024;
-			*p = realloc(points, *max*sizeof(GLfloat));
-			*c = realloc(colors, *max*sizeof(GLfloat));
-			points = *p;
-			colors = *c;
-		}
-		colors[*num] = colour.g;
-		points[*num] = y2;
-		*num = *num + 1;
+		colors[*num][0] = colour.r;
+		points[*num][0] = x2;
 
-		if (*num >= *max) {
-			*max = *max + 1024;
-			*p = realloc(points, *max*sizeof(GLfloat));
-			*c = realloc(colors, *max*sizeof(GLfloat));
-			points = *p;
-			colors = *c;
-		}
-		colors[*num] = colour.b;
-		points[*num] = 65.0f;
-		*num = *num + 1;
+		colors[*num][1] = colour.g;
+		points[*num][1] = y2;
 
+		colors[*num][2] = colour.b;
+		points[*num][2] = 65.0f;
+
+		*num = *num + 1;
 		pos++;
 	}
 }
