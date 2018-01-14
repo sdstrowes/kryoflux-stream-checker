@@ -77,7 +77,7 @@ int glvis_init(struct gl_state *s)
 	glBindVertexArray(state.vertex_array_id);
 
 	// Create and compile our GLSL program from the shaders
-	state.program_id = load_shaders( "TransformVertexShader.vertexshader", "TextureFragmentShader.fragmentshader" );
+	state.program_id = load_shaders( "transform.shader", "colour.shader" );
 
 	// Get a handle for our "MVP" uniform
 	state.matrix_id = glGetUniformLocation(state.program_id, "MVP");
