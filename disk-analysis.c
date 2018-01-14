@@ -6,7 +6,6 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include "vis.h"
 #include "stream.h"
 #include "disk-analysis-log.h"
 
@@ -14,6 +13,8 @@
 
 #define TRACK_MAX 84
 #define SIDES      2
+
+#include "visgl.h"
 
 
 void print_help(char *binary_name)
@@ -78,6 +79,7 @@ int main(int argc, char *argv[])
 				log_dbg("Error reading %s", fn);
 				free(track);
 			}
+
 			free(fn);
 		}
 	}
@@ -88,6 +90,49 @@ int main(int argc, char *argv[])
 			decode_track(&track->t);
 		}
 	}
+
+	//struct viscairo *img_out = viscairo_init();
+
+	GLfloat *points = (GLfloat *)calloc(1, sizeof(GLfloat)*3*1024); // FIXME arbitrary start point
+	GLfloat *colors = (GLfloat *)calloc(1, sizeof(GLfloat)*3*1024); // FIXME arbitrary start point
+	int points_count =    0;
+	int points_max   = 1024;
+
+//	int i = 0;
+	for (side = 1; side < SIDES; side++) {
+		struct track_data *track;
+		STAILQ_FOREACH(track, &disk.side[side], next) {
+			build_buffers(&track->t, &points, &colors, &points_count, &points_max);
+			printf("SIDE %d\n", side);
+//			i++;
+//			if (i > 3) {
+//				break;
+//			}
+		}
+	}
+
+	int rc;
+	struct gl_state s;
+	rc = glvis_init(&s);
+
+	rc = glvis_paint(&s, points, points_count, colors, points_count);
+
+	rc = glvis_destroy(&s);
+
+//	int i = 0;
+//	struct viscairo *img_out = viscairo_init();
+//	for (side = 1; side < SIDES; side++) {
+//		struct track_data *track;
+//		STAILQ_FOREACH(track, &disk.side[side], next) {
+//			plot_track(img_out, &track->t);
+//			printf("SIDE %d\n", side);
+////			i++;
+////			if (i > 1) {
+////				break;
+////			}
+//		}
+//	}
+//	viscairo_destroy(&img_out);
 
 //	FILE *svg_out = test_svg_out();
 //	STAILQ_FOREACH(track, &head, next) {

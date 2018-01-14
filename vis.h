@@ -5,6 +5,7 @@
 #define __vis_h__
 
 struct colour {
+	uint8_t err;
         uint8_t r;
         uint8_t g;
         uint8_t b;

@@ -389,7 +389,7 @@ int decode_pass(struct track *track, uint32_t index, uint32_t next_index, uint32
 
 	// parse whole track
 	int error_count = 0;
-	int i = 0;
+//	int i = 0;
 	while (index < next_index && index < track->flux_array_idx) {
 		double flux_us = track->flux_array[index] / track->sample_clock;
 		if (test_flux_timing(flux_us)) {
