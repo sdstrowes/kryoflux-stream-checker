@@ -9,7 +9,6 @@
 #include <cglm/cglm.h>
 
 #include "shader.h"
-#include "texture.h"
 #include "controls.h"
 //#include "viscairo.h"
 #include "visgl.h"
@@ -114,6 +113,7 @@ int glvis_paint(struct gl_state *state, const GLfloat *points_buffer, int points
 	glBufferData(GL_ARRAY_BUFFER, color_buffer_size*sizeof(GLfloat)*3,  color_buffer,  GL_STATIC_DRAW);
 
 	glPointSize(8);
+	glLineWidth(8);
 
 	printf("%0.2f, %0.2f, %0.2f\n", points_buffer[0], points_buffer[1], points_buffer[2]);
 
@@ -273,40 +273,40 @@ uint32_t color_map[64][3] = {
 
 void calc_colour(double sample, struct colour *colour)
 {
-	if (sample < 0.0000128) {
-		int idx = (sample * 5000000);
-
-		//printf("SAMPLE %0.010f %u %u 0x%02x%02x%02x\n", sample, (int)(sample * 10000000), idx, color_map[idx][0], color_map[idx][1], color_map[idx][2]);
-
-		colour->r = color_map[idx][0];
-		colour->g = color_map[idx][1];
-		colour->b = color_map[idx][2];
-	}
-	else {
-		colour->r = 0xFF;
-		colour->g = 0xFF;
-		colour->b = 0xFF;
-	}
-
-
-//	memset(colour, 0, sizeof(struct rgb));
+//	if (sample < 0.0000128) {
+//		int idx = (sample * 5000000);
 //
-//	if (	!(	(sample > 0.0000075 && sample < 0.0000085) ||
-//			(sample > 0.0000055 && sample < 0.0000065) ||
-//			(sample > 0.0000035 && sample < 0.0000045)	)
-//	) {
-//		colour->err = 1;
-//	}
+//		//printf("SAMPLE %0.010f %u %u 0x%02x%02x%02x\n", sample, (int)(sample * 10000000), idx, color_map[idx][0], color_map[idx][1], color_map[idx][2]);
 //
-//	if (sample > 0.0000075 && sample < 0.0000085) {
-//		colour->r = 0xff;
+//		colour->r = color_map[idx][0];
+//		colour->g = color_map[idx][1];
+//		colour->b = color_map[idx][2];
 //	}
-//	if (sample > 0.0000055 && sample < 0.0000065) {
-//		colour->g = 0xff;
+//	else {
+//		colour->r = 0xFF;
+//		colour->g = 0xFF;
+//		colour->b = 0xFF;
 //	}
-//	if (sample > 0.0000035 && sample < 0.0000045) {
-//		colour->b = 0xff;
-//	}
+
+
+	memset(colour, 0, sizeof(struct colour));
+
+	if (	!(	(sample > 0.0000075 && sample < 0.0000085) ||
+			(sample > 0.0000055 && sample < 0.0000065) ||
+			(sample > 0.0000035 && sample < 0.0000045)	)
+	) {
+		colour->err = 1;
+	}
+
+	if (sample > 0.0000075 && sample < 0.0000085) {
+		colour->r = 0xff;
+	}
+	if (sample > 0.0000055 && sample < 0.0000065) {
+		colour->g = 0xff;
+	}
+	if (sample > 0.0000035 && sample < 0.0000045) {
+		colour->b = 0xff;
+	}
 }
 
 
@@ -339,8 +339,6 @@ void build_buffers(struct track *track, GLfloat **p, GLfloat **c, int *num, int 
 
 	double pos_counter = 0.0;
 
-	int yup = 0;
-
 	while (pos < track->flux_array_idx && pos < end) {
 
 		int ctr = 0;
@@ -354,11 +352,6 @@ void build_buffers(struct track *track, GLfloat **p, GLfloat **c, int *num, int 
 		angle = (pos-start) * fraction;
 		double x2 = get_x(r, angle, ctr);
 		double y2 = get_y(r, angle, ctr);
-
-		if (!yup) {
-			printf("POINT t:%u r:%0.4f x:%0.4f y:%0.4f\n", track->track, r, x2, y2);
-			yup = 1;
-		}
 
 		double sample = track->flux_array[pos]/track->sample_clock;
 		pos_counter += sample;

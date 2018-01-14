@@ -63,6 +63,12 @@ void computeMatricesFromInputs(struct gl_state *s){
 //		glm_vec_scale(direction, delta_time * speed, delta);
 //		glm_vec_add(position, delta, position);
 //	}
+	if (glfwGetKey( window, GLFW_KEY_1 ) == GLFW_PRESS){
+		printf("no-op: side-selector pressed\n");
+	}
+	if (glfwGetKey( window, GLFW_KEY_2 ) == GLFW_PRESS){
+		printf("no-op: side-selector pressed\n");
+	}
 	if (glfwGetKey( window, GLFW_KEY_W ) == GLFW_PRESS){
 		vec3 delta;
 		glm_vec_scale(up, delta_time * speed, delta);
