@@ -1,8 +1,18 @@
+#include <cairo/cairo.h>
+#include <errno.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <libgen.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include <linux/limits.h>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -32,6 +42,8 @@ int glvis_init(struct gl_state *s)
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_DECORATED, 0);
+	glfwWindowHint(GLFW_FOCUSED, 0);
 
 	// Open a window and create its OpenGL context
 	window = glfwCreateWindow( state.screen_width, state.screen_height, "Disk Viewer Test", NULL, NULL);
@@ -61,7 +73,7 @@ int glvis_init(struct gl_state *s)
 	glfwSetCursorPos(window, state.screen_width/2, state.screen_height/2);
 
 	// black background
-	glClearColor(0, 0, 0, 0);
+	glClearColor(0xff, 0xff, 0xff, 0xff);
 
 	// Enable depth test
 	glEnable(GL_DEPTH_TEST);
@@ -88,6 +100,100 @@ int glvis_init(struct gl_state *s)
 	return 0;
 }
 
+int mkdir_p(const char *path)
+{
+	/* Adapted from http://stackoverflow.com/a/2336245/119527 */
+	const size_t len = strlen(path);
+	char _path[PATH_MAX];
+	char *p;
+
+	errno = 0;
+
+	/* Copy string so it's mutable */
+	if (len > sizeof(_path)-1) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	strcpy(_path, path);
+
+	/* Iterate the string */
+	for (p = _path + 1; *p; p++) {
+		if (*p == '/') {
+			/* Temporarily truncate */
+			*p = '\0';
+
+			if (mkdir(_path, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) != 0) {
+				if (errno != EEXIST)
+					return -1;
+			}
+
+			*p = '/';
+		}
+	}
+
+	if (mkdir(_path, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) != 0) {
+		if (errno != EEXIST) {
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+void check_path_exists(char *fn)
+{
+	char path[PATH_MAX];
+	memset(path, '\0', PATH_MAX);
+	strncpy(path, fn, PATH_MAX-1);
+	char *dirpath = dirname(path);
+
+	printf("PATH: %s\n", dirpath);
+
+	int ret = mkdir_p(dirpath);
+	if (ret != 0) {
+	        printf("Error building path %s\n", dirpath);
+	        exit(1);
+	}
+}
+
+void dump_image(char *fn)
+{
+	printf("Gonna dump to %s\n", fn);
+
+	int rc;
+	int width  = 1080;
+	int height = 1080;
+
+	printf("Opening new: %s\n", fn);
+	check_path_exists(fn);
+
+	int stride = cairo_format_stride_for_width(CAIRO_FORMAT_RGB24, width);
+	printf("str: %u\n", stride);
+
+	/* grab image data */
+	uint8_t *pixels = malloc(stride * height);
+	glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+
+	cairo_surface_t *surface = cairo_image_surface_create_for_data(pixels,
+				     CAIRO_FORMAT_ARGB32,
+				     width,
+				     height,
+				     stride);
+
+	/* write to surface */
+	rc = cairo_surface_write_to_png(surface, fn);
+	if (rc != CAIRO_STATUS_SUCCESS) {
+		printf("Status: %s\n", cairo_status_to_string(rc));
+		exit(1);
+	}
+
+	/* be done */
+	cairo_surface_destroy(surface);
+
+	exit(1);
+}
+
 int glvis_destroy(struct gl_state *state)
 {
 	// Cleanup VBO and shader
@@ -102,7 +208,7 @@ int glvis_destroy(struct gl_state *state)
 	return 0;
 }
 
-int glvis_paint(struct gl_state *state, const vec3 *points_buffer, int points_buffer_size, const vec3 *color_buffer, int color_buffer_size)
+int glvis_paint(struct gl_state *state, const vec3 *points_buffer, int points_buffer_size, const vec3 *color_buffer, int color_buffer_size, bool do_dump_image, char *dump_fn)
 {
 	glGenBuffers(1, &(state->vertexbuffer));
 	glBindBuffer(GL_ARRAY_BUFFER, state->vertexbuffer);
@@ -168,6 +274,10 @@ int glvis_paint(struct gl_state *state, const vec3 *points_buffer, int points_bu
 
 		// Actually draw things
 		glDrawArrays(GL_LINE_STRIP, 0, points_buffer_size);
+
+		if (do_dump_image == true) {
+			dump_image(dump_fn);
+		}
 
 		glDisableVertexAttribArray(0);
 		glDisableVertexAttribArray(1);
@@ -427,7 +537,7 @@ int main()
 	};
 
 
-	rc = glvis_paint(&s, points, num_points, points_colors, num_points);
+	rc = glvis_paint(&s, points, num_points, points_colors, num_points, true, "/tmp/test.png");
 
 	rc = glvis_destroy(&s);
 }

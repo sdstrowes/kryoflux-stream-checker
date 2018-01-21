@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
 	struct gl_state s;
 	rc = glvis_init(&s);
 
-	rc = glvis_paint(&s, points, points_count, colors, points_count);
+	rc = glvis_paint(&s, points, points_count, colors, points_count, false, "/tmp/test.png");
 
 	rc = glvis_destroy(&s);
 
