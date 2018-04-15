@@ -521,6 +521,8 @@ void parse_data_stream(struct track *track)
 			if (rc != 0) {
 				/* reset */
 				parser_state = SEEKING_PRE_ID;
+				free(sector->data.data);
+				free(sector);
 				sector = NULL;
 
 				break;
