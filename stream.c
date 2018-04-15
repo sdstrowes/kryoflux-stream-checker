@@ -4,6 +4,19 @@
 #include "stream.h"
 #include "disk-analysis-log.h"
 
+void sector_init(struct sector **s)
+{
+	struct sector *sector = (struct sector *)malloc(sizeof(struct sector));
+	sector->pass_count    = 0;
+	memset(&sector->meta, 0, sizeof(struct sector_meta));
+	memset(&sector->data, 0, sizeof(struct sector_pass));
+	sector->data.data     = (uint8_t *)malloc(512);
+	memset(sector->data.data, 0, 512);
+	sector->data.data_len = 512;
+
+	*s = sector;
+}
+
 void append_index(struct track *track, uint32_t stream_pos, uint32_t sample_counter, uint32_t index_counter)
 {
 	if (track->indices_idx >= track->indices_max - 1) {
@@ -272,6 +285,7 @@ int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 	track->flux_array_max = 1;
 	track->flux_array = NULL;
 
+	LIST_INIT(&(track->sectors));
 
 	log_dbg("CLOCKS: %.10f %.10f %.10f",
 		track->master_clock, track->sample_clock, track->index_clock);
@@ -389,26 +403,11 @@ int decode_pass(struct track *track, uint32_t index, uint32_t next_index, uint32
 
 	// parse whole track
 	int error_count = 0;
-//	int i = 0;
 	while (index < next_index && index < track->flux_array_idx) {
 		double flux_us = track->flux_array[index] / track->sample_clock;
 		if (test_flux_timing(flux_us)) {
 			error_count++;
 		}
-
-//		printf("PRP %0.2f\n", flux_us * 1000 * 1000);
-
-//		if (i == 0) {
-//			printf("FLUXES: POS: %05x:%05x, SIDE: %u, TRACK: %2u, PASS: %u: ", index, next_index, track->side, track->track, pass);
-//		}
-//		if (i < 10) {
-//			printf("%0.3f ", flux_us * 1000 * 1000);
-//			i++;
-//		}
-//		if (i == 10) {
-//			printf("\n");
-//			i++;
-//		}
 
 		*flux_sum += track->flux_array[index];
 		flux_count++;
@@ -439,7 +438,7 @@ int decode_pass(struct track *track, uint32_t index, uint32_t next_index, uint32
 	return index;
 }
 
-int decode_track(struct track *track)
+int decode_flux(struct track *track)
 {
 	uint32_t pass;
 

@@ -6,6 +6,8 @@
 
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
+void print_bin(char *buffer, uint8_t val, int n);
+
 void log_init(const char *id, int debug);
 
 char *_log_msg_fmt(const char *format, ...)

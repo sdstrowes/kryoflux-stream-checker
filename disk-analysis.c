@@ -7,8 +7,9 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include "stream.h"
 #include "disk-analysis-log.h"
+#include "mfm.h"
+#include "stream.h"
 
 #include "queue.h"
 
@@ -87,7 +88,52 @@ int main(int argc, char *argv[])
 	for (side = 0; side < SIDES; side++) {
 		struct track_data *track;
 		STAILQ_FOREACH(track, &disk.side[side], next) {
-			decode_track(&track->t);
+			decode_flux(&track->t);
+		}
+	}
+	for (side = 0; side < SIDES; side++) {
+		struct track_data *track;
+		STAILQ_FOREACH(track, &disk.side[side], next) {
+			decode_flux_to_mfm(&track->t);
+		}
+	}
+
+	for (side = 0; side < SIDES; side++) {
+		struct track_data *track;
+		STAILQ_FOREACH(track, &disk.side[side], next) {
+			struct track  *t = &track->t;
+			struct sector *sector;
+
+			int i;
+
+			int counts[MAX_SECTORS];
+			uint16_t sector_hdr_crc[MAX_SECTORS];
+			uint16_t sector_dat_crc[MAX_SECTORS];
+			for (i = 0; i < MAX_SECTORS; i++) {
+				counts[i] = 0;
+			}
+
+			LIST_FOREACH(sector, &(t->sectors), next) {
+				if (sector->meta.calc_crc == sector->meta.disk_crc &&
+				    sector->data.calc_crc == sector->data.disk_crc) {
+					if (counts[sector->meta.sector_num-1] == 0) {
+						sector_hdr_crc[sector->meta.sector_num-1] = sector->meta.disk_crc;
+						sector_dat_crc[sector->meta.sector_num-1] = sector->data.disk_crc;
+						counts[sector->meta.sector_num-1]++;
+					}
+					else {
+						if (sector_hdr_crc[sector->meta.sector_num-1] == sector->meta.disk_crc &&
+						    sector_dat_crc[sector->meta.sector_num-1] == sector->data.disk_crc) {
+								counts[sector->meta.sector_num-1]++;
+						}
+					}
+				}
+
+			}
+
+			for (i = 0; i < MAX_SECTORS; i++) {
+				log_msg("side:%u track:%02u sector:%02u: %02u good reads", track->t.side, track->t.track, i, counts[i]);
+			}
 		}
 	}
 
@@ -112,12 +158,13 @@ int main(int argc, char *argv[])
 	}
 
 	int rc;
-	struct gl_state s;
-	rc = glvis_init(&s);
+//	struct gl_state s;
+//	rc = glvis_init(&s);
+//	rc = glvis_paint(&s, points, points_count, colors, points_count, true, "/tmp/test.png");
+//	rc = glvis_destroy(&s);
 
-	rc = glvis_paint(&s, points, points_count, colors, points_count, false, "/tmp/test.png");
-
-	rc = glvis_destroy(&s);
+	free(points);
+	free(colors);
 
 //	int i = 0;
 //	struct viscairo *img_out = viscairo_init();
@@ -139,11 +186,22 @@ int main(int argc, char *argv[])
 //		plot_track(svg_out, &track->t);
 //	}
 
-//	finalise_svg(svg_out);
+
 
 	for (side = 0; side < SIDES; side++) {
 		while (!STAILQ_EMPTY(&disk.side[side])) {
 			struct track_data *track = STAILQ_FIRST(&disk.side[side]);
+
+			while (!LIST_EMPTY(&(track->t.sectors))) {
+				struct sector *sector = LIST_FIRST(&(track->t.sectors));
+				LIST_REMOVE(sector, next);
+				free(sector->data.data);
+				free(sector);
+			}
+
+			free(track->t.flux_array);
+			bytestream_destroy(&(track->t.stream));
+
 			STAILQ_REMOVE_HEAD(&disk.side[side], next);
 			free(track);
 		}

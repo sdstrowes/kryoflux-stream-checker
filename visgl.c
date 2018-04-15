@@ -419,9 +419,6 @@ void calc_colour(double sample, struct colour *colour)
 	}
 }
 
-
-
-
 void build_buffers(struct track *track, vec3 **p, vec3 **c, int *num, int *max)
 {
 	vec3 *points = *p;

@@ -1,5 +1,6 @@
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <syslog.h>
 
 #include "disk-analysis-log.h"
@@ -8,6 +9,18 @@
 #define MAX_LEN (BUF_LEN - 1)
 
 static int msg_threshold;
+
+void print_bin(char *buffer, uint8_t val, int n)
+{
+	int i;
+	for (i = 0; i < n; i++) {
+		if ((val >> (n-i-1)) & 0x1) {
+			buffer[i] = '1';
+		} else {
+			buffer[i] = '0';
+		}
+	}
+}
 
 static void printf_log_func(int level, const char *msg)
 {
