@@ -1,4 +1,5 @@
 #include <limits.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -428,9 +429,9 @@ void parse_data_stream(struct track *track)
 	char *sts_str;
 	int   sts_str_len = LINE_MAX-1;
 
-	struct sector *sector;
+	struct sector *sector = NULL;
 
-
+	bool   good_parse = false;
 	struct bytestream *stream = track->stream;
 
 	parser_state = UNSYNCED;
@@ -619,6 +620,7 @@ void parse_data_stream(struct track *track)
 
 			/* ------------------------------------------------------- */
 			LIST_INSERT_HEAD(&track->sectors, sector, next);
+			good_parse = true;
 
 			parser_state = SEEKING_PRE_ID;
 
@@ -629,6 +631,11 @@ void parse_data_stream(struct track *track)
 			log_err("welp");
 		}
 		}
+	}
+
+	if (sector != NULL && !good_parse) {
+		free(sector);
+		sector = NULL;
 	}
 }
 
