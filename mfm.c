@@ -434,10 +434,11 @@ void parse_data_stream(struct track *track)
 	parser_state = UNSYNCED;
 	i = 0;
 
-	while (parser_state != TRACK_COMPLETE) {
-		struct sector *sector = NULL;
-		bool   good_parse = false;
+	struct sector *sector     = NULL;
+	bool           good_parse = false;
 
+
+	while (parser_state != TRACK_COMPLETE) {
 		switch (parser_state) {
 		case UNSYNCED: {
 			int found_marker = 0;
@@ -504,7 +505,12 @@ void parse_data_stream(struct track *track)
 			if (i >= stream->ptr*8) {
 				parser_state = TRACK_COMPLETE;
 			}
-			sector_init(&sector);
+			if (sector == NULL) {
+				sector_init(&sector);
+			}
+			else {
+				log_err("ERROR: attempted to re-init a sector");
+			}
 			break;
 		}
 
@@ -513,7 +519,10 @@ void parse_data_stream(struct track *track)
 			log_dbg("IN:  FOUND_ID: i: %x", i);
 			int rc = parse_id_record(sector, stream, i);
 			if (rc != 0) {
+				/* reset */
 				parser_state = SEEKING_PRE_ID;
+				sector = NULL;
+
 				break;
 			}
 
@@ -563,6 +572,10 @@ void parse_data_stream(struct track *track)
 			default: {
 				log_err("Unknown sync pattern! [%s]", log_line);
 				parser_state = SEEKING_PRE_ID;
+
+				free(sector->data.data);
+				free(sector);
+				sector = NULL;
 			}
 			}
 
@@ -616,10 +629,11 @@ void parse_data_stream(struct track *track)
 
 			log_msg("%s", log_line);
 
-			/* ------------------------------------------------------- */
+			/* store */
 			LIST_INSERT_HEAD(&track->sectors, sector, next);
-			good_parse = true;
 
+			/* reset */
+			sector = NULL;
 			parser_state = SEEKING_PRE_ID;
 
 			break;
@@ -630,11 +644,12 @@ void parse_data_stream(struct track *track)
 		}
 		}
 
-		if (sector != NULL && !good_parse) {
-			free(sector->data.data);
-			free(sector);
-			sector = NULL;
-		}
+	}
+
+	if (sector != NULL && !good_parse) {
+		free(sector->data.data);
+		free(sector);
+		sector = NULL;
 	}
 
 }
