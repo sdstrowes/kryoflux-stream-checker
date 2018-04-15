@@ -429,16 +429,14 @@ void parse_data_stream(struct track *track)
 	char *sts_str;
 	int   sts_str_len = LINE_MAX-1;
 
-	struct sector *sector = NULL;
-
-	bool   good_parse = false;
 	struct bytestream *stream = track->stream;
 
 	parser_state = UNSYNCED;
 	i = 0;
 
 	while (parser_state != TRACK_COMPLETE) {
-
+		struct sector *sector = NULL;
+		bool   good_parse = false;
 
 		switch (parser_state) {
 		case UNSYNCED: {
@@ -631,13 +629,14 @@ void parse_data_stream(struct track *track)
 			log_err("welp");
 		}
 		}
+
+		if (sector != NULL && !good_parse) {
+			free(sector->data.data);
+			free(sector);
+			sector = NULL;
+		}
 	}
 
-	if (sector != NULL && !good_parse) {
-		free(sector->data.data);
-		free(sector);
-		sector = NULL;
-	}
 }
 
 void count_flux_sum(struct track *track, uint32_t index, uint32_t next_index, uint32_t pass, uint32_t *flux_sum)
