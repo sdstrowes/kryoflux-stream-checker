@@ -634,6 +634,7 @@ void parse_data_stream(struct track *track)
 	}
 
 	if (sector != NULL && !good_parse) {
+		free(sector->data.data);
 		free(sector);
 		sector = NULL;
 	}
