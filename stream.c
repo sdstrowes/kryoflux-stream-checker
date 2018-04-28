@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "mfm.h"
 #include "stream.h"
 #include "disk-analysis-log.h"
 
@@ -392,7 +394,7 @@ int test_flux_timing(double flux_us)
 	return 1;
 }
 
-int decode_pass(struct track *track, uint32_t index, uint32_t next_index, uint32_t pass, uint32_t *flux_sum, struct stream_stats *stats)
+int decode_pass(struct track *track, uint32_t index, uint32_t next_index, uint32_t pass, uint32_t *flux_sum)
 {
 	uint32_t flux_count = 0;
 
@@ -431,8 +433,8 @@ int decode_pass(struct track *track, uint32_t index, uint32_t next_index, uint32
 			track->side, track->track, pass, next_index, index-1, next_index);
 	}
 
-	if (pass < stats->pass_count_max) {
-		stats->error_rate[pass] = (error_count / (float)flux_count * 100);
+	if (pass < track->stats.pass_count_max) {
+		track->stats.error_rate[pass] = (error_count / (float)flux_count * 100);
 	}
 
 	return index;
@@ -445,9 +447,8 @@ int decode_flux(struct track *track)
 	uint32_t last_index_counter  = 0;
 	uint32_t last_sample_counter = 0;
 
-	struct stream_stats stats;
-	stats.pass_count_max = PASS_COUNT_DEFAULT;
-	stats.error_rate = (double *)malloc(sizeof(double)*PASS_COUNT_DEFAULT);
+	track->stats.pass_count_max = PASS_COUNT_DEFAULT;
+	track->stats.error_rate     = (double *)malloc(sizeof(double)*PASS_COUNT_DEFAULT);
 
 	for (pass = 0; pass < track->indices_idx; pass++) {
 		log_dbg("[S:%u, T:%02u, PASS:%x] INDEX: %05x %0.3f [%0.3f:%0.3f:%0.3f] %x",
@@ -474,7 +475,7 @@ int decode_flux(struct track *track)
 		uint32_t next_index_pos = track->indices[pass+1].stream_pos;
 
 
-		decode_pass(track, index_pos, next_index_pos, pass, &flux_sum, &stats);
+		decode_pass(track, index_pos, next_index_pos, pass, &flux_sum);
 
 		log_dbg("[S:%x, T:%02u, PASS:%x] SAMPLE CLOCK: %0.3fus",
 			track->side, track->track, pass,
@@ -500,7 +501,7 @@ int decode_flux(struct track *track)
 	uint16_t i = 0;
 	double total = 0;
 	for ( ; i < pass; i++) {
-		total += stats.error_rate[i];
+		total += track->stats.error_rate[i];
 	}
 	log_msg("[S:%x, T:%02u] %f average error rate", track->side, track->track, total);
 
@@ -513,6 +514,9 @@ void free_stream(struct track *track)
 	track->flux_array = NULL;
 	track->flux_array_idx = 0;
 	track->flux_array_max = 1;
+
+	bytestream_destroy(&(track->stream));
+	free(track->stats.error_rate);
 
 	free(track->indices);
 	track->indices = NULL;

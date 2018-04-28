@@ -199,8 +199,7 @@ int main(int argc, char *argv[])
 				free(sector);
 			}
 
-			free(track->t.flux_array);
-			bytestream_destroy(&(track->t.stream));
+			free_stream(&(track->t));
 
 			STAILQ_REMOVE_HEAD(&disk.side[side], next);
 			free(track);

@@ -62,6 +62,12 @@ void sector_init(struct sector **s);
 
 void sector_add_pass();
 
+#define PASS_COUNT_DEFAULT 5
+struct bytestream_stats {
+	uint16_t pass_count_max;
+	double *error_rate;
+};
+
 struct track {
 	double   master_clock;
 	double   sample_clock;
@@ -84,13 +90,9 @@ struct track {
 	LIST_HEAD(sector_list, sector) sectors;
 
 	struct bytestream *stream;
+	struct bytestream_stats stats;
 };
 
-#define PASS_COUNT_DEFAULT 5
-struct stream_stats {
-	uint16_t pass_count_max;
-	double *error_rate;
-};
 
 int  parse_stream(char *, struct track *, uint8_t side, uint8_t track);
 int  decode_flux(struct track *);
