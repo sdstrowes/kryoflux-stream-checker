@@ -419,7 +419,21 @@ void calc_colour(double sample, struct colour *colour)
 	}
 }
 
-void build_buffers(struct track *track, vec3 **p, vec3 **c, int *num, int *max)
+void build_data_buffers(struct track *track, vec3 **p, vec3 **c, int *num, int *max)
+{
+	/* Want to:
+		for each track {
+			for each sector {
+				set location of 0/1 on header section
+				set location of 0/1 on data track
+
+				make a colour distinction on the above?
+			}
+		}
+	*/
+}
+
+void build_stream_buffers(struct track *track, vec3 **p, vec3 **c, int *num, int *max)
 {
 	vec3 *points = *p;
 	vec3 *colors = *c;

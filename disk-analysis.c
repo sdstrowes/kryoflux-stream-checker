@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
 	for (side = 1; side < SIDES; side++) {
 		struct track_data *track;
 		STAILQ_FOREACH(track, &disk.side[side], next) {
-			build_buffers(&track->t, &points, &colors, &points_count, &points_max);
+			build_data_buffers(&track->t, &points, &colors, &points_count, &points_max);
 //			i++;
 //			if (i > 3) {
 //				break;
