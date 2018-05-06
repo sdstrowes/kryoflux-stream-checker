@@ -427,8 +427,6 @@ void build_buffers(struct track *track, vec3 **p, vec3 **c, int *num, int *max)
 	if (track == NULL) {
 		return;
 	}
-	printf("Got track %u\n", track->track);
-
 	uint32_t start = track->indices[0].stream_pos;
 	uint32_t end   = track->indices[1].stream_pos;
 
