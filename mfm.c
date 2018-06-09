@@ -16,8 +16,9 @@ void bytestream_init(struct bytestream **s)
 {
 	struct bytestream *stream = (struct bytestream *)malloc(sizeof(struct bytestream));
 
-	memset(stream->stream, 0, STREAM_BUFFER_SIZE);
-	memset(stream->recent, 0, STREAM_RECENT_WINDOW);
+	memset(stream->stream,   0, STREAM_BUFFER_SIZE  );
+	memset(stream->time_idx, 0, STREAM_BUFFER_SIZE  );
+	memset(stream->recent,   0, STREAM_RECENT_WINDOW);
 	stream->ptr = 0;
 	stream->subptr = 0;
 
@@ -49,6 +50,12 @@ void print_d_c_vals(uint8_t val, uint8_t side, uint8_t track, uint32_t idx)
 	print_bin(buffer1, part1, 4);
 	print_bin(buffer2, part2, 4);
 	print_bin(buffer3,   val, 8);
+}
+
+void bytestream_get_timer(struct bytestream *stream, int location, double *timer)
+{
+	int ptr = location / 8;
+	*timer = stream->time_idx[ptr];
 }
 
 void bytestream_get_location(struct bytestream *stream, int location, uint8_t *buffer, int length)
@@ -107,7 +114,7 @@ uint8_t test_sync_patterns(struct bytestream *stream, int location, int debug_bo
 	return MARKER_UNKNOWN;
 }
 
-void bytestream_push(struct bytestream *stream, uint8_t val, int bits, uint8_t track_num, uint8_t side_num, uint32_t idx)
+void bytestream_push(struct bytestream *stream, uint8_t val, int bits, uint8_t track_num, uint8_t side_num, uint32_t idx, double time_index)
 {
 	char buffer[9];
 	buffer[8] = '\0';
@@ -133,6 +140,7 @@ void bytestream_push(struct bytestream *stream, uint8_t val, int bits, uint8_t t
 			uint8_t byte = stream->stream[stream->ptr];
 			byte = byte | val;
 			stream->stream[stream->ptr] = byte;
+			stream->time_idx[stream->ptr] = time_index;
 		}
 
 		print_d_c_vals(stream->stream[stream->ptr], side_num, track_num, idx);
@@ -413,8 +421,10 @@ void shift_bytestream(struct bytestream *old_stream, uint32_t start_bit, struct 
 	uint32_t bit = start_bit;
 	for ( ; bit < (8*old_stream->ptr)+old_stream->subptr; bit += 8) {
 		uint8_t tmp;
+		double  timer;
 		bytestream_get_location(old_stream, bit, &tmp, 1);
-		bytestream_push(new_stream, tmp, 8, 0, 0, 0);
+		bytestream_get_timer(old_stream, bit, &timer);
+		bytestream_push(new_stream, tmp, 8, 0, 0, 0, timer);
 	}
 
 }
@@ -436,7 +446,6 @@ void parse_data_stream(struct track *track)
 
 	struct sector *sector     = NULL;
 	bool           good_parse = false;
-
 
 	while (parser_state != TRACK_COMPLETE) {
 		switch (parser_state) {
@@ -667,7 +676,7 @@ void count_flux_sum(struct track *track, uint32_t index, uint32_t next_index, ui
 	 */
 	while (index < next_index && index < track->flux_array_idx) {
 		index++;
-		double flux_us = track->flux_array[index] / track->sample_clock;
+		//double flux_us = track->flux_array[index] / track->sample_clock;
 		*flux_sum += track->flux_array[index];
 	}
 
@@ -691,19 +700,24 @@ int mfm_decode_passes(struct track *track, uint32_t index, uint32_t next_index)
 	bytestream_init(&stream);
 	track->stream = stream;
 
+	double time_index = 0.0;
+
 	while (index < next_index && index < track->flux_array_idx) {
 		double flux_us = track->flux_array[index] / track->sample_clock;
 
+		time_index += flux_us;
 		index++;
 
+//		*flux_sum += track->flux_array[index];
+
 		if (flux_us > 0.0000034 && flux_us < 0.0000046) {
-			bytestream_push(stream, 0x00000001, 2, track->side, track->track, index);
+			bytestream_push(stream, 0x00000001, 2, track->side, track->track, index, time_index);
 		}
 		else if (flux_us > 0.0000054 && flux_us < 0.0000066) {
-			bytestream_push(stream, 0x00000001, 3, track->side, track->track, index);
+			bytestream_push(stream, 0x00000001, 3, track->side, track->track, index, time_index);
 		}
 		else if (flux_us > 0.0000074 && flux_us < 0.0000086) {
-			bytestream_push(stream, 0x00000001, 4, track->side, track->track, index);
+			bytestream_push(stream, 0x00000001, 4, track->side, track->track, index, time_index);
 		}
 //		else {
 //			log_dbg("[side:%u, track:%u] Trying to parse %0.7f", track->side, track->track, flux_us);
@@ -723,43 +737,46 @@ int mfm_decode_passes(struct track *track, uint32_t index, uint32_t next_index)
 
 int decode_flux_to_mfm(struct track *track)
 {
-	uint32_t pass;
+//	uint32_t pass;
 
-	uint32_t last_index_counter  = 0;
-	uint32_t last_sample_counter = 0;
+//	uint32_t last_index_counter  = 0;
+//	uint32_t last_sample_counter = 0;
 
-	for (pass = 0; pass < track->indices_idx; pass++) {
-		uint32_t flux_sum       = 0;
-		uint32_t index_pos      = track->indices[pass].stream_pos;
-		uint32_t next_index_pos = track->indices[pass+1].stream_pos;
+//	for (pass = 0; pass < track->indices_idx; pass++) {
+//		uint32_t flux_sum       = 0;
+//		uint32_t index_pos      = track->indices[pass].stream_pos;
+//		uint32_t next_index_pos = track->indices[pass+1].stream_pos;
+//
+//		log_dbg("MFM [S:%u, T:%02u, PASS:%x] INDEX: %05x %0.3f [%0.3f:%0.3f:%0.3f] %x",
+//			track->side, track->track, pass,
+//			track->indices[pass].stream_pos,
+//			track->indices[pass].sample_counter                  / track->sample_clock * 1000 * 1000,
+//			track->flux_array[track->indices[pass].stream_pos-1] / track->sample_clock * 1000 * 1000,
+//			track->flux_array[track->indices[pass].stream_pos]   / track->sample_clock * 1000 * 1000,
+//			track->flux_array[track->indices[pass].stream_pos+1] / track->sample_clock * 1000 * 1000,
+//			track->indices[pass].index_counter);
+//
+//		count_flux_sum(track, index_pos, next_index_pos, pass, &flux_sum);
+//
+//		log_dbg("MFM [S:%x, T:%02u, PASS:%x] SAMPLE CLOCK: %0.3fus",
+//			track->side, track->track, pass,
+//			track->indices[pass].sample_counter / track->sample_clock * 1000 * 1000);
+//
+//		double idx_clock = pass ? (track->indices[pass].index_counter - last_index_counter)/track->index_clock : 0.0;
+//
+//		log_dbg("MFM [S:%x, T:%02u, PASS:%x] INDEX CLOCK:  %f (%f)",
+//			track->side, track->track, pass,
+//			track->indices[pass].index_counter/track->index_clock,
+//			idx_clock);
+//
+//		uint32_t diff = flux_sum - last_sample_counter + track->indices[pass].sample_counter;
+//		log_dbg("MFM [S:%x, T:%02u, PASS:%u] Space between indices: %0.3fms; %0.3f RPM",
+//			track->side, track->track, pass,
+//			diff/track->sample_clock * 1000,
+//			60/(diff/track->sample_clock));
+//	}
 
-		log_dbg("MFM [S:%u, T:%02u, PASS:%x] INDEX: %05x %0.3f [%0.3f:%0.3f:%0.3f] %x",
-			track->side, track->track, pass,
-			track->indices[pass].stream_pos,
-			track->indices[pass].sample_counter                  / track->sample_clock * 1000 * 1000,
-			track->flux_array[track->indices[pass].stream_pos-1] / track->sample_clock * 1000 * 1000,
-			track->flux_array[track->indices[pass].stream_pos]   / track->sample_clock * 1000 * 1000,
-			track->flux_array[track->indices[pass].stream_pos+1] / track->sample_clock * 1000 * 1000,
-			track->indices[pass].index_counter);
-
-		count_flux_sum(track, index_pos, next_index_pos, pass, &flux_sum);
-
-		log_dbg("MFM [S:%x, T:%02u, PASS:%x] SAMPLE CLOCK: %0.3fus",
-			track->side, track->track, pass,
-			track->indices[pass].sample_counter / track->sample_clock * 1000 * 1000);
-
-		log_dbg("MFM [S:%x, T:%02u, PASS:%x] INDEX CLOCK:  %f (%f)",
-			track->side, track->track, pass,
-			track->indices[pass].index_counter/track->index_clock,
-			pass ? (track->indices[pass].index_counter - last_index_counter)/track->index_clock : 0.0);
-
-		uint32_t diff = flux_sum - last_sample_counter + track->indices[pass].sample_counter;
-		log_dbg("MFM [S:%x, T:%02u, PASS:%u] Space between indices: %0.3fms; %0.3f RPM",
-			track->side, track->track, pass,
-			diff/track->sample_clock * 1000,
-			60/(diff/track->sample_clock));
-	}
-
+	uint32_t pass = track->indices_idx - 1;
 
 	uint32_t first_index = track->indices[0].stream_pos;
 	uint32_t last_index  = track->indices[pass-1].stream_pos;

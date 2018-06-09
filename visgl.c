@@ -18,6 +18,7 @@
 #include <GLFW/glfw3.h>
 #include <cglm/cglm.h>
 
+#include "disk-analysis-log.h"
 #include "shader.h"
 #include "controls.h"
 //#include "viscairo.h"
@@ -421,16 +422,45 @@ void calc_colour(double sample, struct colour *colour)
 
 void build_data_buffers(struct track *track, vec3 **p, vec3 **c, int *num, int *max)
 {
+	int drawn[MAX_SECTORS];
+	int good_reads[MAX_SECTORS];
+	int total_reads[MAX_SECTORS];
+	int i;
+	for (i = 0; i < MAX_SECTORS; i++) {
+		drawn[i]       = 0;
+		good_reads[i]  = 0;
+		total_reads[i] = 0;
+	}
 	/* Want to:
-		for each track {
-			for each sector {
-				set location of 0/1 on header section
-				set location of 0/1 on data track
+		for each sector {
+			set location of 0/1 on header section
+			set location of 0/1 on data track
 
-				make a colour distinction on the above?
-			}
+			make a colour distinction on the above?
 		}
 	*/
+	struct sector *sector;
+	LIST_FOREACH(sector, &(track->sectors), next) {
+		if (sector->meta.calc_crc == sector->meta.disk_crc &&
+		    sector->data.calc_crc == sector->data.disk_crc) {
+			good_reads[sector->meta.sector_num-1]++;
+		}
+		total_reads[sector->meta.sector_num-1]++;
+	}
+
+	LIST_FOREACH(sector, &(track->sectors), next) {
+	//for (i = 0; i < MAX_SECTORS; i++) {
+		int i = sector->meta.sector_num;
+		if (good_reads[i] == total_reads[i] && !drawn[i]) {
+			// do something
+
+			log_dbg("I want to draw this sector between %f -> %f / %f -> %f\n",
+				sector->meta.start_ms, sector->meta.end_ms,
+				sector->data.start_ms, sector->data.end_ms);
+
+			drawn[i] = true;
+		}
+	}
 }
 
 void build_stream_buffers(struct track *track, vec3 **p, vec3 **c, int *num, int *max)

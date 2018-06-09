@@ -27,6 +27,7 @@ struct bytestream
 {
 	uint8_t stream[STREAM_BUFFER_SIZE];
 	uint8_t recent[STREAM_RECENT_WINDOW];
+	double  time_idx[STREAM_BUFFER_SIZE];
 	uint32_t ptr;
 	uint8_t subptr;
 };
@@ -39,6 +40,9 @@ struct sector_meta {
 	uint16_t size;
 	uint16_t calc_crc;
 	uint16_t disk_crc;
+
+	double start_ms;
+	double end_ms;
 };
 
 struct sector_pass {
@@ -46,6 +50,9 @@ struct sector_pass {
 	uint16_t data_len;
 	uint16_t calc_crc;
 	uint16_t disk_crc;
+
+	double start_ms;
+	double end_ms;
 };
 
 struct sector {
