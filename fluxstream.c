@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "mfm.h"
-#include "stream.h"
+#include "fluxstream.h"
 #include "disk-analysis-log.h"
 
 void sector_init(struct sector **s)
@@ -262,7 +262,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 	return 0;
 }
 
-int parse_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
+int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
 {
 	FILE *input;
 	uint32_t stream_pos = 0;

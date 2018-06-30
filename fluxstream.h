@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include "queue.h"
 
-#ifndef __stream_h__
-#define __stream_h__
+#ifndef __fluxstream_h__
+#define __fluxstream_h__
 
 
 #define SECTOR_BYTES_MAX 4096
@@ -101,7 +101,7 @@ struct track {
 };
 
 
-int  parse_stream(char *, struct track *, uint8_t side, uint8_t track);
+int  parse_flux_stream(char *, struct track *, uint8_t side, uint8_t track);
 int  decode_flux(struct track *);
 void dump_stream(struct track *);
 void free_stream(struct track *);

@@ -9,7 +9,7 @@
 
 #include "disk-analysis-log.h"
 #include "mfm.h"
-#include "stream.h"
+#include "fluxstream.h"
 
 #include "queue.h"
 
@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
 			struct track_data *track = malloc(sizeof(struct track_data));
 			fn = (char *)malloc(strlen(fn_prefix) + 8 + 1);
 			sprintf(fn, "%s%02u.%u.raw", fn_prefix, track_num, side);
-			int rc = parse_stream(fn, &track->t, side, track_num);
+			int rc = parse_flux_stream(fn, &track->t, side, track_num);
 			if (!rc) {
 				log_dbg("Loaded %s", fn);
 				STAILQ_INSERT_TAIL(&disk.side[side], track, next);

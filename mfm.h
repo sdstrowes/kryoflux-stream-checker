@@ -1,7 +1,7 @@
 #ifndef __MFM_H__
 #define __MFM_H__
 
-#include "stream.h"
+#include "fluxstream.h"
 
 #define MARKER_UNKNOWN            0
 #define MARKER_PRE                1

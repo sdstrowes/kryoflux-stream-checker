@@ -5,7 +5,6 @@
 
 #include "disk-analysis-log.h"
 #include "mfm.h"
-#include "stream.h"
 
 const uint16_t SECTOR_LEN[] = { 128, 256, 512, 1024 };
 

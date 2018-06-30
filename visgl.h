@@ -4,7 +4,7 @@
 #include <cglm/vec3.h>
 #include <GLFW/glfw3.h>
 #include <stdbool.h>
-#include "stream.h"
+#include "fluxstream.h"
 
 #define M_PIRADS (M_PI / 180.0)
 

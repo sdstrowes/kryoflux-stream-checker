@@ -1,5 +1,5 @@
 
-#include "stream.h"
+#include "fluxstream.h"
 
 #ifndef __vis_h__
 #define __vis_h__
