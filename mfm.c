@@ -547,8 +547,10 @@ void parse_data_stream(struct track *track)
 				log_err("sprintf() error?");
 				break;
 			}
-	
-			sts_str = "[ID Seg OK]";
+
+			char sts_str[80];
+			sts_str[0] = '\0';
+			sprintf(sts_str, "[ID Seg: %sOK%s]", KGRN, KNRM);
 			strncat(log_line, sts_str, sts_str_len);
 			sts_str_len -= strlen(sts_str);
 

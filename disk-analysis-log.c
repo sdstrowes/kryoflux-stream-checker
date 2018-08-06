@@ -70,10 +70,11 @@ char *_log_msg_fmt(const char *fmt, ...)
 	return msg;
 }
 
-int _log_msg(const char *file, const char * func, int line, char *msg)
+int _log_msg(char *msg)
 {
 	char buf[BUF_LEN];
-	snprintf(buf, MAX_LEN, "[%16.16s: %04u,%.16s] %s", file, line, func, msg);
+	buf[0] = '\0';
+	snprintf(buf, MAX_LEN, "%s", msg);
 	if (_log_func) {
 		_log_func(LOG_INFO, buf);
 	}
