@@ -429,7 +429,7 @@ int decode_pass(struct track *track, uint32_t index, uint32_t next_index, uint32
 
 	// Decoder must manually insert an empty flux at the end.
 	if (index != next_index) {
-		log_err("[S:%x, T:%02u, PASS:%u, next_index:%5x] NOT FOUND, AT END? %x %x",
+		log_err("[Phase 1: S:%x, T:%02u, PASS:%u, next_index:%5x] NOT FOUND, AT END? %x %x",
 			track->side, track->track, pass, next_index, index-1, next_index);
 	}
 
@@ -477,17 +477,17 @@ int decode_flux(struct track *track)
 
 		decode_pass(track, index_pos, next_index_pos, pass, &flux_sum);
 
-		log_dbg("[S:%x, T:%02u, PASS:%x] SAMPLE CLOCK: %0.3fus",
+		log_dbg("[Phase 1: S:%x, T:%02u, PASS:%x] SAMPLE CLOCK: %0.3fus",
 			track->side, track->track, pass,
 			track->indices[pass].sample_counter / track->sample_clock * 1000 * 1000);
 
-		log_dbg("[S:%x, T:%02u, PASS:%x] INDEX CLOCK:  %f (%f)",
+		log_dbg("[Phase 1: S:%x, T:%02u, PASS:%x] INDEX CLOCK:  %f (%f)",
 			track->side, track->track, pass,
 			track->indices[pass].index_counter/track->index_clock,
 			pass ? (track->indices[pass].index_counter - last_index_counter)/track->index_clock : 0.0);
 
 		uint32_t diff = flux_sum - last_sample_counter + track->indices[pass].sample_counter;
-		log_dbg("[S:%x, T:%02u, PASS:%u] Space between indices: %0.3fms; %0.3f RPM",
+		log_dbg("[Phase 1: S:%x, T:%02u, PASS:%u] Space between indices: %0.3fms; %0.3f RPM",
 			track->side, track->track, pass,
 			diff/track->sample_clock * 1000,
 			60/(diff/track->sample_clock));
@@ -503,7 +503,7 @@ int decode_flux(struct track *track)
 	for ( ; i < pass; i++) {
 		total += track->stats.error_rate[i];
 	}
-	log_msg("[S:%x, T:%02u] %f average error rate", track->side, track->track, total);
+	log_msg("[Phase 1: S:%x, T:%02u] %f average error rate", track->side, track->track, total);
 
 	return 0;
 }

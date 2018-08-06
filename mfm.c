@@ -683,7 +683,7 @@ void count_flux_sum(struct track *track, uint32_t index, uint32_t next_index, ui
 
 	// Decoder must manually insert an empty flux at the end.
 	if (index != next_index) {
-		log_err("MFMTRACK [S:%x, T:%02u, PASS:%u, next_index:%5x] NOT FOUND, AT END? %x %x",
+		log_err("MFMTRACK [Phase 1: S:%x, T:%02u, PASS:%u, next_index:%5x] NOT FOUND, AT END? %x %x",
 			track->side, track->track, pass, next_index, index-1, next_index);
 	}
 }
@@ -727,7 +727,7 @@ int mfm_decode_passes(struct track *track, uint32_t index, uint32_t next_index)
 
 	// Decoder must manually insert an empty flux at the end.
 	if (index != next_index) {
-		log_err("MFMTRACK [S:%x, T:%02u, next_index:%5x] NOT FOUND, AT END? %x %x",
+		log_err("MFMTRACK [Phase 1: S:%x, T:%02u, next_index:%5x] NOT FOUND, AT END? %x %x",
 			track->side, track->track, next_index, index-1, next_index);
 	}
 
