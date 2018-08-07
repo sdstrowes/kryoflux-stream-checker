@@ -538,7 +538,7 @@ void parse_data_stream(struct track *track)
 
 			i += ID_RECORD_LEN_BITS;
 			parser_state = SEEKING_POST_ID;
-			rc = sprintf(log_line, "[side:%02x, track:%02x, sector:%02x, size:%u]",
+			rc = sprintf(log_line, "[Phase 2: side:%02x, track:%02x, sector:%02x, size:%u]",
 					sector->meta.side,
 					sector->meta.track,
 					sector->meta.sector_num,
