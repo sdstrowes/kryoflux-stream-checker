@@ -428,6 +428,45 @@ void shift_bytestream(struct bytestream *old_stream, uint32_t start_bit, struct 
 
 }
 
+
+void summarise_and_log_read_status(struct sector_list sectors)
+{
+	struct sector *sector;
+	int reads[MAX_SECTORS];
+	memset(reads, 0, MAX_SECTORS*sizeof(int));
+	LIST_FOREACH(sector, &sectors, next) {
+		if (sector->meta.calc_crc == sector->meta.disk_crc &&
+		    sector->data.calc_crc == sector->data.disk_crc) {
+			reads[sector->meta.sector_num-1]++;
+		}
+		//total_reads[sector->meta.sector_num-1]++;
+	}
+
+	char reads_str[LINE_MAX];
+	reads_str[0] = '\0';
+	int i;
+	for (i = 0; i < MAX_SECTORS; i++) {
+		char *colour = NULL;
+		if (reads[i] > 0) {
+			colour = KGRN;
+		}
+		else {
+			colour = KRED;
+		}
+
+		int len = strlen(reads_str);
+		if (len > 0) {
+			snprintf(reads_str+len, LINE_MAX-len-1, ", %s%2u%s", colour, i+1, KNRM);
+		}
+		else {
+			snprintf(reads_str+len, LINE_MAX-len-1, "%s%2u%s", colour, i+1, KNRM);
+		}
+	}
+
+	log_msg("READS: %s", reads_str);
+}
+
+
 void parse_data_stream(struct track *track)
 {
 	unsigned int i;
@@ -663,6 +702,10 @@ void parse_data_stream(struct track *track)
 		free(sector);
 		sector = NULL;
 	}
+
+
+	summarise_and_log_read_status(track->sectors);
+
 
 }
 
