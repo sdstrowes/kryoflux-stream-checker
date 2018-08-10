@@ -31,50 +31,56 @@ STAILQ_HEAD(side, track_data);
 
 struct disk_streams {
 	struct side side[2];
+	char *name_prefix;
 };
 
-int main(int argc, char *argv[])
+void init_struct_disk(struct disk_streams *disk, char *name_prefix)
 {
-	char c;
-	char *fn_prefix = NULL;
-	int log_level = LOG_INFO;
+	STAILQ_INIT(&disk->side[0]);
+	STAILQ_INIT(&disk->side[1]);
 
-	opterr = 0;	// silence error output on bad options
-	while ((c = getopt (argc, argv, "dn:")) != -1) {
-		switch (c) {
-		case 'n': {
-			fn_prefix = optarg;
-			break;
-		}
-		case 'd': {
-			log_level = LOG_DEBUG;
-		}
+	disk->name_prefix = name_prefix;
+}
+
+void free_struct_disk(struct disk_streams *disk)
+{
+	int side;
+	for (side = 0; side < SIDES; side++) {
+		while (!STAILQ_EMPTY(&disk->side[side])) {
+			struct track_data *track = STAILQ_FIRST(&disk->side[side]);
+
+			while (!LIST_EMPTY(&(track->t.sectors))) {
+				struct sector *sector = LIST_FIRST(&(track->t.sectors));
+				LIST_REMOVE(sector, next);
+				free(sector->data.data);
+				free(sector);
+			}
+
+			free_stream(&(track->t));
+
+			STAILQ_REMOVE_HEAD(&disk->side[side], next);
+			free(track);
 		}
 	}
+}
 
-	if (fn_prefix == NULL) {
-		print_help(argv[0]);
-		exit(1);
-	}
-
-	log_init("", log_level);
-
-	struct disk_streams disk;
-	STAILQ_INIT(&disk.side[0]);
-	STAILQ_INIT(&disk.side[1]);
-
+void parse_disk_fluxes_from_files(struct disk_streams *disk)
+{
 	int track_num;
 	int side;
-	char *fn;
-	for (track_num = 0; track_num < TRACK_MAX; track_num++) {
-		for (side = 0; side < SIDES; side++) {
+
+	for (side = 0; side < SIDES; side++) {
+		for (track_num = 0; track_num < TRACK_MAX; track_num++) {
 			struct track_data *track = malloc(sizeof(struct track_data));
-			fn = (char *)malloc(strlen(fn_prefix) + 8 + 1);
-			sprintf(fn, "%s%02u.%u.raw", fn_prefix, track_num, side);
+
+			char *fn = (char *)malloc(strlen(disk->name_prefix) + 8 + 1);
+			sprintf(fn, "%s%02u.%u.raw", disk->name_prefix, track_num, side);
+
 			int rc = parse_flux_stream(fn, &track->t, side, track_num);
 			if (!rc) {
 				log_dbg("Loaded %s", fn);
-				STAILQ_INSERT_TAIL(&disk.side[side], track, next);
+				decode_flux(&track->t);
+				STAILQ_INSERT_TAIL(&disk->side[side], track, next);
 			}
 			else {
 				log_dbg("Error reading %s", fn);
@@ -84,23 +90,27 @@ int main(int argc, char *argv[])
 			free(fn);
 		}
 	}
+}
 
+void parse_atari_mfm_from_flux(struct disk_streams *disk)
+{
+	int side;
 	for (side = 0; side < SIDES; side++) {
 		struct track_data *track;
-		STAILQ_FOREACH(track, &disk.side[side], next) {
-			decode_flux(&track->t);
-		}
-	}
-	for (side = 0; side < SIDES; side++) {
-		struct track_data *track;
-		STAILQ_FOREACH(track, &disk.side[side], next) {
+		STAILQ_FOREACH(track, &disk->side[side], next) {
 			decode_flux_to_mfm(&track->t);
 		}
 	}
+}
+
+
+void vis_mfm_dat(struct disk_streams *disk)
+{
+	int side;
 
 	for (side = 0; side < SIDES; side++) {
 		struct track_data *track;
-		STAILQ_FOREACH(track, &disk.side[side], next) {
+		STAILQ_FOREACH(track, &disk->side[side], next) {
 			struct track  *t = &track->t;
 			struct sector *sector;
 
@@ -148,7 +158,7 @@ int main(int argc, char *argv[])
 //	int i = 0;
 	for (side = 1; side < SIDES; side++) {
 		struct track_data *track;
-		STAILQ_FOREACH(track, &disk.side[side], next) {
+		STAILQ_FOREACH(track, &disk->side[side], next) {
 			build_data_buffers(&track->t, &points, &colors, &points_count, &points_max);
 //			i++;
 //			if (i > 3) {
@@ -157,7 +167,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	int rc;
+//	int rc;
 //	struct gl_state s;
 //	rc = glvis_init(&s);
 //	rc = glvis_paint(&s, points, points_count, colors, points_count, true, "/tmp/test.png");
@@ -185,26 +195,43 @@ int main(int argc, char *argv[])
 //	STAILQ_FOREACH(track, &head, next) {
 //		plot_track(svg_out, &track->t);
 //	}
+}
 
+int main(int argc, char *argv[])
+{
+	char c;
+	char *fn_prefix = NULL;
+	int log_level = LOG_INFO;
 
-
-	for (side = 0; side < SIDES; side++) {
-		while (!STAILQ_EMPTY(&disk.side[side])) {
-			struct track_data *track = STAILQ_FIRST(&disk.side[side]);
-
-			while (!LIST_EMPTY(&(track->t.sectors))) {
-				struct sector *sector = LIST_FIRST(&(track->t.sectors));
-				LIST_REMOVE(sector, next);
-				free(sector->data.data);
-				free(sector);
-			}
-
-			free_stream(&(track->t));
-
-			STAILQ_REMOVE_HEAD(&disk.side[side], next);
-			free(track);
+	opterr = 0;	// silence error output on bad options
+	while ((c = getopt (argc, argv, "dn:")) != -1) {
+		switch (c) {
+		case 'n': {
+			fn_prefix = optarg;
+			break;
+		}
+		case 'd': {
+			log_level = LOG_DEBUG;
+		}
 		}
 	}
+
+	if (fn_prefix == NULL) {
+		print_help(argv[0]);
+		exit(1);
+	}
+
+	log_init("", log_level);
+
+	struct disk_streams disk;
+	init_struct_disk(&disk, fn_prefix);
+
+	parse_disk_fluxes_from_files(&disk);
+
+	parse_atari_mfm_from_flux(&disk);
+
+	free_struct_disk(&disk);
+
 
 	return 0;
 }
