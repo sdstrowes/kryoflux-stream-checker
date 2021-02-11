@@ -366,7 +366,7 @@ uint16_t calc_crc(uint8_t d, uint16_t crc_val)
 }
 
 
-int parse_data(struct sector *sector, struct bytestream *stream, int location, int length_bytes)
+int parse_data(struct disk *disk, struct sector *sector, struct bytestream *stream, int location, int length_bytes)
 {
 	int rc = 0;
 
@@ -385,16 +385,54 @@ int parse_data(struct sector *sector, struct bytestream *stream, int location, i
 		log_err("Data byte leading into data sector should be 0xfb, but is %02x", d);
 	}
 
+	uint8_t *data_bytes = (uint8_t *)calloc(1, 512);
+
+
 	while (rc < length_bytes) {
-		rc++;
 
 		bytestream_get_location(stream, location, data, 2);
 		separate_data_clock(data, &d, &c);
 
+		log_msg("[DATA %02x %02x %02x %u] %u/%u: %02x",
+			sector->meta.side,
+			sector->meta.track,
+			sector->meta.sector_num,
+			location,
+			rc, length_bytes,
+			d);
+
+		//data[rc] = d;
+
+		data_bytes[rc] = d;
+
 		location += 16;
 
 		crc_val = calc_crc(d, crc_val);
+		rc++;
 	}
+
+	int i;
+	for (i = 0; i < 512; i++) {
+		if (!(i % 8)) {
+			printf("\nDATA2 %x/%02x/%02x %03x:",
+			sector->meta.side,
+			sector->meta.track,
+			sector->meta.sector_num,
+			i);
+		}
+		printf(" %02x", data_bytes[i]);
+	}
+	printf("\n");
+
+	//disk->side[sector->meta.side].track[sector->meta.track].sector[sector->meta.sector_num].data.data = data_bytes;
+
+	printf("DATA:");
+	//int i;
+	//for (i = 0; i < 156; i++) {
+	//	printf("\n %u %u\n", length_bytes, i);
+	//	printf(" %02x", disk->side[sector->meta.side].track[sector->meta.track].sector[sector->meta.sector_num].data.data[i]);
+	//}
+	//printf("\n");
 
 	uint8_t crc[2];
 	bytestream_get_location(stream, location, crc, 2);
@@ -467,7 +505,7 @@ void summarise_and_log_read_status(struct sector_list sectors)
 }
 
 
-void parse_data_stream(struct track *track)
+void parse_data_stream(struct disk *disk, struct track *track)
 {
 	unsigned int i;
 	unsigned int bit;
@@ -602,16 +640,16 @@ void parse_data_stream(struct track *track)
 			i += rc * 8 * 2;
 			log_dbg("[parsed ID record post-mark: %u 0x4e's]", rc);
 
-			rc = parse_sync_mark(stream, i);
-			log_dbg("[parsed zero gap: %u 0x00's]", rc);
-			i += rc * 8 * 2;
-
 			parser_state = SEEKING_DATA;
 
 			break;
 		}
 
 		case SEEKING_DATA: {
+			int rc = parse_sync_mark(stream, i);
+			log_dbg("[parsed zero gap: %u 0x00's]", rc);
+			i += rc * 8 * 2;
+
 			uint8_t code = test_sync_patterns(stream, i, 1);
 			switch (code) {
 			case MARKER_PRE: {
@@ -634,7 +672,7 @@ void parse_data_stream(struct track *track)
 		}
 
 		case FOUND_DATA: {
-			int rc = parse_data(sector, stream, i, 512);
+			int rc = parse_data(disk, sector, stream, i, 512);
 			log_dbg("[parsed data field; %u bytes", rc);
 			if (rc != 512 + 1 + 2) {
 				if (sector->data.disk_crc != sector->data.calc_crc) {
@@ -779,7 +817,7 @@ int mfm_decode_passes(struct track *track, uint32_t index, uint32_t next_index)
 
 
 
-int decode_flux_to_mfm(struct track *track)
+int decode_flux_to_mfm(struct disk *disk, struct track *track)
 {
 //	uint32_t pass;
 
@@ -829,7 +867,7 @@ int decode_flux_to_mfm(struct track *track)
 	mfm_decode_passes(track, first_index, last_index);
 
 	log_dbg("MFM [S:%x, T:%02u] Gonna parse the data out", track->side, track->track);
-	parse_data_stream(track);
+	parse_data_stream(disk, track);
 
 	return 0;
 }

@@ -75,6 +75,23 @@ struct bytestream_stats {
 	double *error_rate;
 };
 
+struct sector_array {
+	struct sector sector[MAX_SECTORS];
+	//struct sector_meta meta[10];
+	//struct sector_pass sector[10];
+};
+
+struct track_array {
+	struct sector_array track[81];
+};
+
+
+// disk.side[0..1].track[0..81].sector[0..9].meta/sector
+struct disk {
+	struct track_array side[2];
+};
+
+
 struct track {
 	double   master_clock;
 	double   sample_clock;

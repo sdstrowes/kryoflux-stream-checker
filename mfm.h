@@ -12,7 +12,7 @@
 
 int decode_pass(struct track *track, uint32_t index, uint32_t next_index, uint32_t pass, uint32_t *flux_sum);
 
-int decode_flux_to_mfm(struct track *track);
+int decode_flux_to_mfm(struct disk *disk, struct track *track);
 
 void bytestream_destroy(struct bytestream **s);
 
