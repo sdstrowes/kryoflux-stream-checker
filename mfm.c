@@ -15,9 +15,9 @@ void bytestream_init(struct bytestream **s)
 {
 	struct bytestream *stream = (struct bytestream *)malloc(sizeof(struct bytestream));
 
-	memset(stream->stream,   0, STREAM_BUFFER_SIZE  );
-	memset(stream->time_idx, 0, STREAM_BUFFER_SIZE  );
-	memset(stream->recent,   0, STREAM_RECENT_WINDOW);
+	memset(stream->stream,   STREAM_BUFFER_SIZE,   sizeof(stream->stream));
+	memset(stream->time_idx, STREAM_BUFFER_SIZE,   sizeof(stream->time_idx));
+	memset(stream->recent,   STREAM_RECENT_WINDOW, sizeof(stream->recent));
 	stream->ptr = 0;
 	stream->subptr = 0;
 
