@@ -1,6 +1,6 @@
 TARGET = disk-analysis
-LIBS = -lGL -lGLEW -lglfw -lm -lcairo
-INCS = -I/usr/include/GLFW/
+LIBS =
+INCS =
 CC = gcc
 CFLAGS = -g -Wall -Wextra
 
