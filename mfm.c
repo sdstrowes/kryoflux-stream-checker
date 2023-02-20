@@ -99,7 +99,7 @@ struct sync_mark { uint8_t bytes[6]; };
 // This is 3x 0x41 on the data plane
 struct sync_mark pre_mark = { { 0x44, 0x89, 0x44, 0x89, 0x44, 0x89 } };
 
-uint8_t test_sync_patterns(struct bytestream *stream, int location, int debug_bool)
+uint8_t test_sync_patterns(struct bytestream *stream, int location, bool debug)
 {
 	int rc;
 	uint8_t data[6];
@@ -533,7 +533,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 			/* Scan forward to find a sector marker; use this to byte-align */
 			for (bit = 0; bit < (8*stream->ptr)+stream->subptr; bit++) {
 			//for (bit = i; bit < (8*stream->ptr)+stream->subptr; bit++) {
-				uint8_t code = test_sync_patterns(stream, bit, 0);
+				uint8_t code = test_sync_patterns(stream, bit, false);
 				switch (code) {
 				case MARKER_PRE: {
 					log_dbg("I FOUND A PRE-INDEX MARKER AT BIT %04x", bit);
@@ -570,7 +570,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 			log_dbg("I think I'm byte-aligned; at bit %04x in range: 0000 .. %04x", i, stream->ptr*8 + stream->subptr);
 
 			for (; i < stream->ptr*8; i++) {
-				uint8_t code = test_sync_patterns(stream, i, 1);
+				uint8_t code = test_sync_patterns(stream, i, true);
 				//switch (code) {
 				//case MARKER_PRE: {
 				if (code == MARKER_PRE) {
@@ -650,7 +650,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 			log_dbg("[parsed zero gap: %u 0x00's]", rc);
 			i += rc * 8 * 2;
 
-			uint8_t code = test_sync_patterns(stream, i, 1);
+			uint8_t code = test_sync_patterns(stream, i, true);
 			switch (code) {
 			case MARKER_PRE: {
 				parser_state = FOUND_ID;
