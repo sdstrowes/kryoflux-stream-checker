@@ -95,7 +95,7 @@ void parse_atari_mfm_from_flux(struct disk_streams *disk, struct disk *disk_data
 	for (side = 0; side < SIDES; side++) {
 		struct track_data *track;
 		STAILQ_FOREACH(track, &disk->side[side], next) {
-			decode_flux_to_mfm(disk, &track->t);
+			decode_flux_to_mfm(disk_data, &track->t);
 		}
 	}
 }
