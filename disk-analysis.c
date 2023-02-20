@@ -1,4 +1,3 @@
-#include <cglm/vec3.h>
 #include <getopt.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -15,8 +14,6 @@
 
 #define TRACK_MAX 84
 #define SIDES      2
-
-#include "visgl.h"
 
 void print_help(char *binary_name)
 {
