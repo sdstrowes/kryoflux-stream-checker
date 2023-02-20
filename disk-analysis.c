@@ -17,7 +17,12 @@
 
 void print_help(char *binary_name)
 {
-	printf("usage: %s -n basename\n", binary_name);
+	printf("%s:\n", binary_name);
+	printf("Required:\n");
+	printf(" -n <prefix>: common prefix for flux trace filenames\n");
+	printf("Optional:\n");
+	printf(" -d: enable debug\n");
+	printf(" -h: this help\n");
 }
 
 struct track_data {
@@ -100,7 +105,6 @@ void parse_atari_mfm_from_flux(struct disk_streams *disk, struct disk *disk_data
 	}
 }
 
-
 int main(int argc, char *argv[])
 {
 	char c;
@@ -108,7 +112,7 @@ int main(int argc, char *argv[])
 	int log_level = LOG_INFO;
 
 	opterr = 0;	// silence error output on bad options
-	while ((c = getopt (argc, argv, "dn:")) != -1) {
+	while ((c = getopt (argc, argv, "dhn:")) != -1) {
 		switch (c) {
 		case 'n': {
 			fn_prefix = optarg;
@@ -116,6 +120,11 @@ int main(int argc, char *argv[])
 		}
 		case 'd': {
 			log_level = LOG_DEBUG;
+			break;
+		}
+		case 'h': {
+			print_help(argv[0]);
+			break;
 		}
 		}
 	}
