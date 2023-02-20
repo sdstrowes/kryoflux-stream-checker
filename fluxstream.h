@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include "queue.h"
+#include <sys/queue.h>
 
 #ifndef __fluxstream_h__
 #define __fluxstream_h__

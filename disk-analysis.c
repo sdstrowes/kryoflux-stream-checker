@@ -10,7 +10,7 @@
 #include "mfm.h"
 #include "fluxstream.h"
 
-#include "queue.h"
+#include <sys/queue.h>
 
 #define TRACK_MAX 84
 #define SIDES      2
