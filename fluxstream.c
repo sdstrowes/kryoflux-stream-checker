@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,7 +62,8 @@ int parse_flux2(FILE *f, struct track *track, uint8_t header_val, uint32_t strea
 
 	rc = fread(&val, 1, 1, f);
 	if (rc < 1) {
-		return 1;
+		log_err("fread() fail");
+		exit(1);
 	}
 
 	uint16_t fluxval = (header_val << 8) + val;
@@ -78,11 +80,13 @@ int parse_flux3(FILE *f, struct track *track, uint32_t stream_pos)
 
 	rc = fread(&val1, 1, 1, f);
 	if (rc < 1) {
-		return 1;
+		log_err("fread() fail");
+		exit(1);
 	}
 	rc = fread(&val2, 1, 1, f);
 	if (rc < 1) {
-		return 1;
+		log_err("fread() fail");
+		exit(1);
 	}
 
 	uint16_t fluxval = (val1 << 8) + val2;
@@ -272,6 +276,7 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 		return 1;
 	}
 
+	// values borrowed from http://www.softpres.org/kryoflux:stream
 	track->master_clock = ((18432000 * 73) / 14.0) / 2.0;
 	track->sample_clock = track->master_clock / 2;
 	track->index_clock  = track->master_clock / 16;
@@ -293,17 +298,17 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 		track->master_clock, track->sample_clock, track->index_clock);
 
 
-	uint8_t val;
+	uint8_t encoding_marker;
 	int rc;
-	int pos = 0;
 
 	while (1) {
-		rc = fread(&val, 1, 1, input);
+		rc = fread(&encoding_marker, 1, 1, input);
 		if (rc < 1) {
 			break;
 		}
 
-		switch (val) {
+		// http://www.softpres.org/kryoflux:stream
+		switch (encoding_marker) {
 		case 0x00:
 		case 0x01:
 		case 0x02:
@@ -312,7 +317,7 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 		case 0x05:
 		case 0x06:
 		case 0x07: {
-			parse_flux2(input, track, val, stream_pos);
+			parse_flux2(input, track, encoding_marker, stream_pos);
 			stream_pos += 2;
 			break;
 		}
@@ -324,18 +329,22 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 		}
 		// two-byte no-op
 		case 0x09: {
+			rc = fseek(input, 1, SEEK_CUR);
+			if (rc != 0) {
+				log_err("fseek() failed at pos %u: \"%s\"", stream_pos, strerror(errno));
+				exit(1);
+			}
 			stream_pos += 2;
-			rc = fread(&val, 1, 1, input);
-			if (rc < 1) { log_err("Failed read at pos %u", pos); break; }
 			break;
 		}
-		// three-byte no-op
+		// three-byte no-op; seek forward two additional bytes
 		case 0x0a: {
+			rc = fseek(input, 2, SEEK_CUR);
+			if (rc != 0) {
+				log_err("fseek() failed at pos %u: \"%s\"", stream_pos, strerror(errno));
+				exit(1);
+			}
 			stream_pos += 3;
-			rc = fread(&val, 1, 1, input);
-			if (rc < 1) { log_err("Failed read at pos %u", pos); break; }
-			rc = fread(&val, 1, 1, input);
-			if (rc < 1) { log_err("Failed read at pos %u", pos); break; }
 			break;
 		}
 		case 0x0b: {
@@ -353,11 +362,11 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 			break;
 		}
 		default: {
-			if (val >= 0x0e) {
-				append_flux(track, val, stream_pos);
+			if (encoding_marker >= 0x0e) {
+				append_flux(track, encoding_marker, stream_pos);
 			}
 			else {
-				log_err("Error: Unknown block type %x", val);
+				log_err("Error: Unknown block type %x", encoding_marker);
 			}
 			stream_pos += 1;
 		}
