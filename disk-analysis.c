@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <getopt.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -66,27 +67,49 @@ void free_struct_disk(struct disk_streams *disk)
 	}
 }
 
+void construct_filename(char **buffer_ptr, char *prefix, int side, int track)
+{
+	// this should be precisely the max, per the sprintf() format string
+	int buffer_size = strlen(prefix) + 8 + 1;
+
+	char *fn = (char *)malloc(buffer_size);
+	memset(fn, '\0', buffer_size);
+	if (fn == NULL) {
+		log_err("malloc() failed; \"%s\"", strerror(errno));
+		exit(1);
+	}
+
+	int rc = snprintf(fn, buffer_size, "%s%02u.%u.raw", prefix, track, side);
+	if (rc >= buffer_size) {
+		log_err("Filename truncated? \"%s\"", fn);
+		log_err("Aborting");
+		exit(1);
+	}
+	*buffer_ptr = fn;
+}
+
+
 void parse_disk_fluxes_from_files(struct disk_streams *disk)
 {
-	int track_num;
+	int track;
 	int side;
 
 	for (side = 0; side < SIDES; side++) {
-		for (track_num = 0; track_num < TRACK_MAX; track_num++) {
-			struct track_data *track = malloc(sizeof(struct track_data));
+		for (track = 0; track < TRACK_MAX; track++) {
+			struct track_data *track_data = malloc(sizeof(struct track_data));
 
-			char *fn = (char *)malloc(strlen(disk->name_prefix) + 8 + 1);
-			sprintf(fn, "%s%02u.%u.raw", disk->name_prefix, track_num, side);
+			char *fn;
+			construct_filename(&fn, disk->name_prefix, side, track);
 
-			int rc = parse_flux_stream(fn, &track->t, side, track_num);
+			int rc = parse_flux_stream(fn, &track_data->t, side, track);
 			if (!rc) {
 				log_dbg("Loaded %s", fn);
-				decode_flux(&track->t);
-				STAILQ_INSERT_TAIL(&disk->side[side], track, next);
+				decode_flux(&track_data->t);
+				STAILQ_INSERT_TAIL(&disk->side[side], track_data, next);
 			}
 			else {
 				log_dbg("Error reading %s", fn);
-				free(track);
+				free(track_data);
 			}
 
 			free(fn);
@@ -124,7 +147,7 @@ int main(int argc, char *argv[])
 		}
 		case 'h': {
 			print_help(argv[0]);
-			break;
+			exit(0);
 		}
 		}
 	}
