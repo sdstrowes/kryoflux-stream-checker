@@ -67,7 +67,7 @@ void free_struct_disk(struct disk_streams *disk)
 	}
 }
 
-void construct_filename(char **buffer_ptr, char *prefix, int side, int track)
+char *construct_filename(char *prefix, int side, int track)
 {
 	// this should be precisely the max, per the sprintf() format string
 	int buffer_size = strlen(prefix) + 8 + 1;
@@ -85,7 +85,8 @@ void construct_filename(char **buffer_ptr, char *prefix, int side, int track)
 		log_err("Aborting");
 		exit(1);
 	}
-	*buffer_ptr = fn;
+
+	return fn;
 }
 
 
@@ -98,8 +99,7 @@ void parse_disk_fluxes_from_files(struct disk_streams *disk)
 		for (track = 0; track < TRACK_MAX; track++) {
 			struct track_data *track_data = malloc(sizeof(struct track_data));
 
-			char *fn;
-			construct_filename(&fn, disk->name_prefix, side, track);
+			char *fn = construct_filename(disk->name_prefix, side, track);
 
 			int rc = parse_flux_stream(fn, &track_data->t, side, track);
 			if (!rc) {
