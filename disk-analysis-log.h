@@ -1,6 +1,7 @@
 #ifndef _DISK_ANALYSIS_LOG_H_
 #define _DISK_ANALYSIS_LOG_H_
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "kf-info.h"
 #include "mfm.h"
 #include "fluxstream.h"
 #include "disk-analysis-log.h"
@@ -96,31 +97,42 @@ int parse_flux3(FILE *f, struct track *track, uint32_t stream_pos)
 	return 1;
 }
 
-int parse_kfinfo(FILE *f, struct track *track, uint32_t stream_pos)
+
+void parse_oob_invalid(FILE *f)
 {
-	uint16_t val;
-	char *str;
-	int rc;
-
-	rc = fread(&val, 2, 1, f);
-	if (rc < 1) {
-		return 1;
+	uint8_t tmp;
+	int rc = fread(&tmp, 1, 1, f);
+	if (rc < 1 || tmp != 0x00) {
+		log_err("no idea what I'm doing with an OOB invalid");
+		return;
 	}
-
-	str = (char*)malloc(val);
-	rc = fread(str, val, 1, f);
-	if (rc < 1) {
-		return 1;
+	rc = fread(&tmp, 1, 1, f);
+	if (rc < 1 || tmp != 0x00) {
+		log_err("no idea what I'm doing with an OOB invalid");
+		return;
 	}
-
-	rc = sscanf(str, "name=KryoFlux DiskSystem, version=2.20s, date=Jan  8 2015, time=13:49:26, hwid=1, hwrv=1, sck=%lf, ick=%lf", &track->sample_clock, &track->index_clock);
-
-	log_dbg("[%5x] KFINFO: '%s'", stream_pos, str);
-
-	free(str);
-
-	return 1;
+	rc = fread(&tmp, 1, 1, f);
+	if (rc < 1 || tmp != 0x00) {
+		log_err("no idea what I'm doing with an OOB invalid");
+		return;
+	}
 }
+
+int parse_oob_stream_read()
+{
+	return 0;
+}
+
+int parse_oob_stream_end()
+{
+	return 0;
+}
+
+int parse_oob_disk_index()
+{
+	return 0;
+}
+
 
 int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 {
@@ -133,19 +145,17 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 	}
 
 	switch (val) {
+	// invalid
 	case 0x00: {
-		uint8_t tmp;
-		rc = fread(&tmp, 1, 1, f);
-		if (rc < 1 || tmp != 0x00) { return 1; }
-		rc = fread(&tmp, 1, 1, f);
-		if (rc < 1 || tmp != 0x00) { return 1; }
-		rc = fread(&tmp, 1, 1, f);
-		if (rc < 1 || tmp != 0x00) { return 1; }
-
+		log_dbg("Parse OOB type %02x: %s", val, "invalid");
+		parse_oob_invalid(f);
 		log_err("Invalid block at pos %x", *stream_pos);
 		break;
 	}
+
+	// stream read
 	case 0x01: {
+		log_dbg("Parse OOB type %02x: %s", val, "stream read");
 		uint16_t tmp;
 		uint32_t oob_stream_pos;
 		uint32_t oob_transfer_time;
@@ -178,6 +188,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		break;
 	}
 	case 0x02: {
+		log_dbg("Parse OOB type %02x: %s", val, "stream end");
 		uint16_t size;
 		uint32_t oob_stream_pos;
 		uint32_t oob_sample_counter;
@@ -214,6 +225,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		break;
 	}
 	case 0x03: {
+		log_dbg("Parse OOB type %02x: %s", val, "disk index");
 		uint16_t size;
 		uint32_t oob_stream_pos;
 		uint32_t oob_result_code;
@@ -242,7 +254,11 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		break;
 	}
 	case 0x04: {
-		parse_kfinfo(f, track, *stream_pos);
+		log_dbg("Parse OOB type %02x: %s", val, "kfinfo");
+		struct kf_info info;
+		memset(&info, 0, sizeof(info));
+		parse_kf_info(f, &info, *stream_pos);
+		log_kf_info(*stream_pos, &info);
 		break;
 	}
 	case 0x0d: {
@@ -258,6 +274,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		break;
 	}
 	default: {
+		log_dbg("Parse OOB type %02x: %s", val, "unknown");
 		log_err("Unknown OOB type %x", val);
 		break;
 	}
