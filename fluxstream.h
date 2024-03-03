@@ -96,19 +96,24 @@ struct track {
 	double   master_clock;
 	double   sample_clock;
 	double   index_clock;
+
 	uint16_t sample_counter;
 	uint32_t index_counter;
 
 	uint8_t side;
 	uint8_t track;
 
+	// constructed from OOB data
 	struct index *indices;
-	uint16_t     *flux_array;
+	// buffer should be the ISB
+	uint16_t     *stream_buf;
+	// this is the parsed sample stream from the ISB
+	uint16_t     *sample_stream;
 
 	uint32_t     indices_idx;
 	uint32_t     indices_max;
-	uint32_t     flux_array_idx;
-	uint32_t     flux_array_max;
+	uint32_t     stream_buf_idx;
+	uint32_t     stream_buf_max;
 
 	struct sector sector[MAX_SECTORS];
 	LIST_HEAD(sector_list, sector) sectors;

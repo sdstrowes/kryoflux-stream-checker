@@ -756,10 +756,10 @@ void count_flux_sum(struct track *track, uint32_t index, uint32_t next_index, ui
 	 * field in Index Block) and subtracting the Sample Counter value of
 	 * the previous index.
 	 */
-	while (index < next_index && index < track->flux_array_idx) {
+	while (index < next_index && index < track->stream_buf_idx) {
 		index++;
-		//double flux_us = track->flux_array[index] / track->sample_clock;
-		*flux_sum += track->flux_array[index];
+		//double flux_us = track->stream_buf[index] / track->sample_clock;
+		*flux_sum += track->stream_buf[index];
 	}
 
 	// Decoder must manually insert an empty flux at the end.
@@ -773,7 +773,7 @@ int mfm_decode_passes(struct track *track, uint32_t index, uint32_t next_index)
 {
 	//uint32_t flux_count = 0;
 
-	if (index >= track->flux_array_idx) {
+	if (index >= track->stream_buf_idx) {
 		log_err("MFMTRACK [S:%x, T:%02u] WARNING: SEEK ERROR ON STREAM_POS %x", track->side, track->track, index);
 		return index;
 	}
@@ -784,13 +784,13 @@ int mfm_decode_passes(struct track *track, uint32_t index, uint32_t next_index)
 
 	double time_index = 0.0;
 
-	while (index < next_index && index < track->flux_array_idx) {
-		double flux_us = track->flux_array[index] / track->sample_clock;
+	while (index < next_index && index < track->stream_buf_idx) {
+		double flux_us = track->stream_buf[index] / track->sample_clock;
 
 		time_index += flux_us;
 		index++;
 
-//		*flux_sum += track->flux_array[index];
+//		*flux_sum += track->stream_buf[index];
 
 		if (flux_us > 0.0000034 && flux_us < 0.0000046) {
 			bytestream_push(stream, 0x00000001, 2, track->side, track->track, index, time_index);
@@ -833,9 +833,9 @@ int decode_flux_to_mfm(struct disk *disk, struct track *track)
 //			track->side, track->track, pass,
 //			track->indices[pass].stream_pos,
 //			track->indices[pass].sample_counter                  / track->sample_clock * 1000 * 1000,
-//			track->flux_array[track->indices[pass].stream_pos-1] / track->sample_clock * 1000 * 1000,
-//			track->flux_array[track->indices[pass].stream_pos]   / track->sample_clock * 1000 * 1000,
-//			track->flux_array[track->indices[pass].stream_pos+1] / track->sample_clock * 1000 * 1000,
+//			track->stream_buf[track->indices[pass].stream_pos-1] / track->sample_clock * 1000 * 1000,
+//			track->stream_buf[track->indices[pass].stream_pos]   / track->sample_clock * 1000 * 1000,
+//			track->stream_buf[track->indices[pass].stream_pos+1] / track->sample_clock * 1000 * 1000,
 //			track->indices[pass].index_counter);
 //
 //		count_flux_sum(track, index_pos, next_index_pos, pass, &flux_sum);

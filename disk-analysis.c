@@ -16,6 +16,9 @@
 #define TRACK_MAX 84
 #define SIDES      2
 
+#define TRACK_MAX 1
+#define SIDES      1
+
 void print_help(char *binary_name)
 {
 	printf("%s:\n", binary_name);
