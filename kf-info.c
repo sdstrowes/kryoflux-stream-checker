@@ -5,9 +5,9 @@
 #include "kf-info.h"
 
 
-void log_kf_info(uint32_t stream_pos, struct kf_info *info)
+void log_kf_info(struct kf_info *info)
 {
-	log_dbg("[%05x] name: %s version: %s hwid: %s, hwrv: %s, sck: %.9f, ick: %.9f", stream_pos,
+	log_dbg("[INFO] name: %s version: %s hwid: %s, hwrv: %s, sck: %.9f, ick: %.9f",
 		info->name,
 		info->version,
 		info->hwid,
@@ -15,29 +15,23 @@ void log_kf_info(uint32_t stream_pos, struct kf_info *info)
 		info->sck,
 		info->ick);
 
-	log_dbg("[%05x] host_date: %s, %s", stream_pos, info->host_date, info->host_time);
-	log_dbg("[%05x] date: %s, %s", stream_pos, info->date, info->time);
+	log_dbg("[INFO] host_date: %s, %s", info->host_date, info->host_time);
+	log_dbg("[INFO] date: %s, %s", info->date, info->time);
 }
 
 
-int parse_kf_info(FILE *f, struct kf_info *info, uint32_t stream_pos)
+int parse_kf_info(FILE *f, uint16_t size, struct kf_info *info)
 {
-	uint16_t val;
 	char *str;
 	int rc;
 
-	rc = fread(&val, 2, 1, f);
+	str = (char*)malloc(size);
+	rc = fread(str, size, 1, f);
 	if (rc < 1) {
 		return 1;
 	}
 
-	str = (char*)malloc(val);
-	rc = fread(str, val, 1, f);
-	if (rc < 1) {
-		return 1;
-	}
-
-	log_dbg("[%05x] ---- %s ----", stream_pos, str);
+	log_dbg("---- %s ----", str);
 
 	char *saveptr1, *saveptr2;
 	char *str1, *str2, *token, *subtoken;

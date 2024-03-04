@@ -134,6 +134,8 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 			break;
 		}
 
+		//printf("STREAM POS: %08x\n", stream_pos);
+
 		// http://www.softpres.org/kryoflux:stream
 		switch (encoding_marker) {
 		case 0x00:
@@ -203,7 +205,6 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 			break;
 		}
 		default: {
-			printf("SECTION [%02x] default\n", encoding_marker);
 			if (encoding_marker >= 0x0e) {
 				append_stream(track, encoding_marker, stream_pos);
 			}

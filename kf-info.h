@@ -18,9 +18,9 @@ struct kf_info {
 	double ick;
 };
 
-void log_kf_info(uint32_t stream_pos, struct kf_info *info);
+void log_kf_info(struct kf_info *info);
 
-int parse_kf_info(FILE *f, struct kf_info *info, uint32_t stream_pos);
+int parse_kf_info(FILE *f, uint16_t size, struct kf_info *info);
 
 
 #endif
