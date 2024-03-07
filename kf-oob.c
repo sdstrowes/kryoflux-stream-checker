@@ -69,25 +69,6 @@ int parse_streaminfo(FILE *f, uint16_t size, uint32_t *stream_pos)
 	}
 
 	rc = fread(&oob_transfer_time, 4, 1, f);
-	printf("What's next? %08x\n", oob_transfer_time);
-	rc = fread(&oob_transfer_time, 4, 1, f);
-	printf("What's next? %08x\n", oob_transfer_time);
-	rc = fread(&oob_transfer_time, 4, 1, f);
-	printf("What's next? %08x\n", oob_transfer_time);
-	rc = fread(&oob_transfer_time, 4, 1, f);
-	printf("What's next? %08x\n", oob_transfer_time);
-	rc = fread(&oob_transfer_time, 4, 1, f);
-	printf("What's next? %08x\n", oob_transfer_time);
-	rc = fread(&oob_transfer_time, 4, 1, f);
-	printf("What's next? %08x\n", oob_transfer_time);
-	rc = fread(&oob_transfer_time, 4, 1, f);
-	printf("What's next? %08x\n", oob_transfer_time);
-	rc = fread(&oob_transfer_time, 4, 1, f);
-	printf("What's next? %08x\n", oob_transfer_time);
-	rc = fread(&oob_transfer_time, 4, 1, f);
-	printf("What's next? %08x\n", oob_transfer_time);
-	rc = fread(&oob_transfer_time, 4, 1, f);
-	printf("What's next? %08x\n", oob_transfer_time);
 
 	return 0;
 }

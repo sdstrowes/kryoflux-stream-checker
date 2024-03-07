@@ -59,9 +59,9 @@ int parse_flux2(FILE *f, struct track *track, uint8_t header_val, uint32_t strea
 
 	uint16_t fluxval = (header_val << 8) + val;
 
-	printf("flux2: appending %02x (pos %04x)\n", header_val, stream_pos);
+	log_dbg("flux2: appending %02x (pos %04x)", header_val, stream_pos);
 	append_stream(track, header_val, stream_pos);
-	printf("flux2: appending %02x (pos %04x)\n", val, (stream_pos+1));
+	log_dbg("flux2: appending %02x (pos %04x)", val, (stream_pos+1));
 	append_stream(track, val, stream_pos+1);
 
 	return 1;
@@ -146,21 +146,21 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 		case 0x05:
 		case 0x06:
 		case 0x07: {
-			printf("SECTION [%02x] flux2\n", encoding_marker);
+			log_dbg("SECTION [%02x] flux2", encoding_marker);
 			parse_flux2(input, track, encoding_marker, stream_pos);
 			stream_pos += 2;
 			break;
 		}
 		// one-byte no-op
 		case 0x08: {
-			printf("SECTION [%02x] no-op 1\n", encoding_marker);
+			log_dbg("SECTION [%02x] no-op 1", encoding_marker);
 			stream_pos += 1;
 			// no-op
 			break;
 		}
 		// two-byte no-op
 		case 0x09: {
-			printf("SECTION [%02x] no-op 2\n", encoding_marker);
+			log_dbg("SECTION [%02x] no-op 2", encoding_marker);
 			rc = fseek(input, 1, SEEK_CUR);
 			if (rc != 0) {
 				log_err("fseek() failed at pos %u: \"%s\"", stream_pos, strerror(errno));
@@ -171,7 +171,7 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 		}
 		// three-byte no-op; seek forward two additional bytes
 		case 0x0a: {
-			printf("SECTION [%02x] no-op 3\n", encoding_marker);
+			log_dbg("SECTION [%02x] no-op 3", encoding_marker);
 			rc = fseek(input, 2, SEEK_CUR);
 			if (rc != 0) {
 				log_err("fseek() failed at pos %u: \"%s\"", stream_pos, strerror(errno));
@@ -181,19 +181,19 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 			break;
 		}
 		case 0x0b: {
-			printf("SECTION [%02x] Overflow16, next flux block should be += 0x10000?\n", encoding_marker);
+			log_dbg("SECTION [%02x] Overflow16, next flux block should be += 0x10000?", encoding_marker);
 			log_err("ALERT: next flux block should be += 0x10000");
 			stream_pos += 1;
 			break;
 		}
 		case 0x0c: {
-			printf("SECTION [%02x] flux3\n", encoding_marker);
+			log_dbg("SECTION [%02x] flux3", encoding_marker);
 			parse_flux3(input, track, stream_pos);
 			stream_pos += 3;
 			break;
 		}
 		case 0x0d: {
-			printf("SECTION [%02x] oob\n", encoding_marker);
+			log_dbg("SECTION [%02x] oob", encoding_marker);
 			rc = parse_oob(input, track, &stream_pos);
 			if (rc == 1) {
 				eod = true;
