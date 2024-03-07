@@ -76,7 +76,7 @@ int _log_msg(const char *file, const char * func, int line, char *msg)
 	buf[0] = '\0';
 
 	if (LOG_INFO > msg_threshold) {
-		snprintf(buf, MAX_LEN, "[%16.16s: %04u,%.16s] ", file, line, func);
+		snprintf(buf, MAX_LEN, "[%16.16s: %04u,%.14s]\t", file, line, func);
 	}
 
 	int len = strlen(buf);
@@ -91,7 +91,7 @@ int _log_msg(const char *file, const char * func, int line, char *msg)
 int _log_dbg(const char *file, const char * func, int line, char *msg)
 {
 	char buf[BUF_LEN];
-	snprintf(buf, MAX_LEN, "[%16.16s: %04u,%.16s] %s", file, line, func, msg);
+	snprintf(buf, MAX_LEN, "[%16.16s: %04u,%.14s]\t%s", file, line, func, msg);
 	if (_log_func) {
 		_log_func(LOG_DEBUG, buf);
 	}
@@ -105,7 +105,7 @@ int _log_err(const char *file, const char * func, int line, char *msg)
 	buf[0] = '\0';
 
 	if (LOG_INFO > msg_threshold) {
-		snprintf(buf, MAX_LEN, "[%16.16s: %04u,%.16s] ", file, line, func);
+		snprintf(buf, MAX_LEN, "[%16.16s: %04u,%.14s]\t", file, line, func);
 	}
 
 	int len = strlen(buf);
