@@ -122,7 +122,7 @@ int parse_oob_disk_index(FILE *f, struct track *track, uint16_t size, uint32_t *
 		return -1;
 	}
 
-	printf("SECTION OOB INDEX oob_stream_pos:%08x sample_counter:%08x index_counter:%08x\n",
+	log_dbg("SECTION OOB INDEX oob_stream_pos:%08x sample_counter:%08x index_counter:%08x",
 		oob_stream_pos, oob_sample_counter, oob_index_counter);
 	append_index(track, oob_stream_pos, oob_sample_counter, oob_index_counter);
 
@@ -205,7 +205,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 	}
 
 	case OOB_KFINFO: {
-		printf("SECTION OOB [%02x] kfinfo\n", type);
+		log_dbg("SECTION OOB [%02x] kfinfo", type);
 		log_dbg("Parse OOB type %02x: %s", type, "kfinfo");
 		struct kf_info info;
 		memset(&info, 0, sizeof(info));
@@ -228,7 +228,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 	}
 
 	default: {
-		printf("SECTION OOB [%02x] default\n", type);
+		log_dbg("SECTION OOB [%02x] default", type);
 		log_dbg("Parse OOB type %02x: %s", type, "unknown");
 		log_err("Unknown OOB type %x", type);
 		return -1;

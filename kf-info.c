@@ -31,10 +31,10 @@ int parse_kf_info(FILE *f, uint16_t size, struct kf_info *info)
 		return 1;
 	}
 
-	log_dbg("---- %s ----", str);
+	log_dbg("kfinfo read:%s", str);
 
 	char *saveptr1, *saveptr2;
-	char *str1, *str2, *token, *subtoken;
+	char *str1, *token;
 
 	char *delim = ",";
 	char *subdelim = "=";

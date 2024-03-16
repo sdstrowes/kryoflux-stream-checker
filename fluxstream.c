@@ -59,10 +59,13 @@ int parse_flux2(FILE *f, struct track *track, uint8_t header_val, uint32_t strea
 
 	uint16_t fluxval = (header_val << 8) + val;
 
-	log_dbg("flux2: appending %02x (pos %04x)", header_val, stream_pos);
-	append_stream(track, header_val, stream_pos);
-	log_dbg("flux2: appending %02x (pos %04x)", val, (stream_pos+1));
-	append_stream(track, val, stream_pos+1);
+	log_dbg("flux2: header: %02x value:%02x", header_val, val);
+	log_dbg("flux2: appending %04x (pos %04x)", fluxval, stream_pos);
+
+//	log_dbg("flux2: appending %02x (pos %04x)", header_val, stream_pos);
+//	append_stream(track, header_val, stream_pos);
+//	log_dbg("flux2: appending %02x (pos %04x)", val, (stream_pos+1));
+//	append_stream(track, val, stream_pos+1);
 
 	return 1;
 }
@@ -193,7 +196,6 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 			break;
 		}
 		case 0x0d: {
-			log_dbg("SECTION [%02x] oob", encoding_marker);
 			rc = parse_oob(input, track, &stream_pos);
 			if (rc == 1) {
 				eod = true;
