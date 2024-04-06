@@ -160,7 +160,11 @@ int parse_oob_stream_end(FILE *f, uint16_t size, uint32_t *stream_pos)
 }
 
 
-
+/*
+ * returns: -1 on error
+ *           0 on a good read
+ *           1 on OOB EOF marker
+ */
 int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 {
 	int rc;
@@ -175,7 +179,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 
 	rc = fread(&size, 2, 1, f);
 	if (rc < 1) {
-		log_err("Error when reading OOB payload size");
+		log_err("Error when reading OOB payload size; read type code %u", type);
 		return -1;
 	}
 
@@ -224,7 +228,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 		}
 
 		log_dbg("[%5x] EOF", *stream_pos);
-		return 0;
+		return 1;
 	}
 
 	default: {
