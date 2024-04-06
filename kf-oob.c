@@ -218,7 +218,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 	case OOB_EOF: {
 		log_dbg("Parse OOB type %02x: %s", type, "index");
 
-		if (size != OOB_INDEX_SIZE) {
+		if (size != OOB_EOF_SIZE) {
 			log_err("OOB EOF block has incorrect length: %04x (should be %04x)", size, OOB_EOF_SIZE);
 			return -1;
 		}
