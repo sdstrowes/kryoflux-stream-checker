@@ -25,7 +25,7 @@ void sector_init(struct sector **s)
 
 
 
-void append_stream(struct track *track, uint16_t flux_val, uint32_t stream_pos)
+void append_stream(struct track *track, flux_t flux_val, uint32_t stream_pos)
 {
 	if (stream_pos >= track->stream_buf_max - 1) {
 		uint32_t old_max = track->stream_buf_max;
@@ -46,7 +46,7 @@ void append_stream(struct track *track, uint16_t flux_val, uint32_t stream_pos)
 }
 
 
-int parse_flux2(FILE *f, struct track *track, uint8_t header_val, uint32_t stream_pos)
+int parse_flux2(FILE *f, struct track *track, uint8_t header_val, bool ovl16, uint32_t stream_pos)
 {
 	uint8_t val;
 	int rc;
@@ -57,20 +57,20 @@ int parse_flux2(FILE *f, struct track *track, uint8_t header_val, uint32_t strea
 		exit(1);
 	}
 
-	uint16_t fluxval = (header_val << 8) + val;
+	flux_t fluxval = (header_val << 8) + val;
+	if (ovl16) {
+		fluxval = 0x10000 + fluxval;
+	}
 
 	log_dbg("flux2: header: %02x value:%02x", header_val, val);
-	log_dbg("flux2: appending %04x (pos %04x)", fluxval, stream_pos);
+	log_dbg("flux2: appending %08x (pos %04x)", fluxval, stream_pos);
 
-//	log_dbg("flux2: appending %02x (pos %04x)", header_val, stream_pos);
-//	append_stream(track, header_val, stream_pos);
-//	log_dbg("flux2: appending %02x (pos %04x)", val, (stream_pos+1));
-//	append_stream(track, val, stream_pos+1);
+	append_stream(track, fluxval, stream_pos);
 
 	return 1;
 }
 
-int parse_flux3(FILE *f, struct track *track, uint32_t stream_pos)
+int parse_flux3(FILE *f, struct track *track, bool ovl16, uint32_t stream_pos)
 {
 	uint8_t val1, val2;
 	int rc;
@@ -85,11 +85,12 @@ int parse_flux3(FILE *f, struct track *track, uint32_t stream_pos)
 		log_err("fread() fail");
 		exit(1);
 	}
+	flux_t fluxval = (val1 << 8) + val2;
+	if (ovl16) {
+		fluxval = 0x10000 + fluxval;
+	}
 
-	//uint16_t fluxval = (val1 << 8) + val2;
-
-	append_stream(track, val1, stream_pos);
-	append_stream(track, val2, stream_pos+1);
+	append_stream(track, fluxval, stream_pos);
 
 	return 1;
 }
@@ -130,6 +131,7 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 	uint8_t encoding_marker;
 	int rc;
 	bool eod = false;
+	bool ovl16 = false;
 
 	while (!eod) {
 		rc = fread(&encoding_marker, 1, 1, input);
@@ -137,7 +139,6 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 			break;
 		}
 
-		//printf("STREAM POS: %08x\n", stream_pos);
 
 		// http://www.softpres.org/kryoflux:stream
 		switch (encoding_marker) {
@@ -150,7 +151,8 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 		case 0x06:
 		case 0x07: {
 			log_dbg("SECTION [%02x] flux2", encoding_marker);
-			parse_flux2(input, track, encoding_marker, stream_pos);
+			parse_flux2(input, track, encoding_marker, ovl16, stream_pos);
+			ovl16 = false; // if this was set, clear it.
 			stream_pos += 2;
 			break;
 		}
@@ -191,7 +193,8 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 		}
 		case 0x0c: {
 			log_dbg("SECTION [%02x] flux3", encoding_marker);
-			parse_flux3(input, track, stream_pos);
+			parse_flux3(input, track, ovl16, stream_pos);
+			ovl16 = false; // if this was set, clear it.
 			stream_pos += 3;
 			break;
 		}
@@ -208,7 +211,13 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 		}
 		default: {
 			if (encoding_marker >= 0x0e) {
-				append_stream(track, encoding_marker, stream_pos);
+				if (ovl16) {
+					append_stream(track, 0x10000 + encoding_marker, stream_pos);
+					ovl16 = false;
+				}
+				else {
+					append_stream(track, encoding_marker, stream_pos);
+				}
 			}
 			else {
 				log_err("Error: Unknown block type %x", encoding_marker);

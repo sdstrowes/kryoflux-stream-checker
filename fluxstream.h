@@ -18,7 +18,7 @@ struct index {
 	uint32_t index_counter;
 };
 
-typedef uint16_t flux_t;
+typedef uint32_t flux_t;
 
 
 #define STREAM_BUFFER_SIZE 4194304
@@ -106,7 +106,7 @@ struct track {
 	// constructed from OOB data
 	struct index *indices;
 	// buffer should be the ISB
-	uint16_t     *stream_buf;
+	uint32_t     *stream_buf;
 	// this is the parsed sample stream from the ISB
 	uint16_t     *sample_stream;
 
