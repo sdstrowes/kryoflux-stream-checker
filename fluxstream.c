@@ -116,7 +116,7 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 
 	track->indices_idx = 0;
 	track->indices_max = 1;
-	track->indices = (struct index *)malloc(sizeof(struct index)*track->indices_max);
+	track->index = (struct index *)malloc(sizeof(struct index)*track->indices_max);
 
 	track->stream_buf_idx = 0;
 	track->stream_buf_max = 1;
@@ -138,7 +138,6 @@ int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track
 		if (rc < 1) {
 			break;
 		}
-
 
 		// http://www.softpres.org/kryoflux:stream
 		switch (encoding_marker) {
@@ -241,8 +240,8 @@ void dump_stream(struct track *track)
 	for (i = 0; i < track->indices_idx; i++) {
 		log_dbg("INDEX: stream_pos:%8x sample_count:%8x index_counter:%8x",
 			i,
-			track->indices[i].sample_counter,
-			track->indices[i].index_counter);
+			track->index[i].sample_counter,
+			track->index[i].index_counter);
 	}
 }
 
@@ -316,12 +315,12 @@ int decode_flux(struct track *track)
 	for (pass = 0; pass < track->indices_idx; pass++) {
 		log_dbg("[S:%u, T:%02u, PASS:%x] INDEX: %05x %0.3f [%0.3f:%0.3f:%0.3f] %x",
 			track->side, track->track, pass,
-			track->indices[pass].stream_pos,
-			track->indices[pass].sample_counter / track->sample_clock * 1000 * 1000,
-			track->stream_buf[track->indices[pass].stream_pos-1] / track->sample_clock * 1000 * 1000,
-			track->stream_buf[track->indices[pass].stream_pos]  / track->sample_clock * 1000 * 1000,
-			track->stream_buf[track->indices[pass].stream_pos+1]  / track->sample_clock * 1000 * 1000,
-			track->indices[pass].index_counter);
+			track->index[pass].stream_pos,
+			track->index[pass].sample_counter / track->sample_clock * 1000 * 1000,
+			track->stream_buf[track->index[pass].stream_pos-1] / track->sample_clock * 1000 * 1000,
+			track->stream_buf[track->index[pass].stream_pos]  / track->sample_clock * 1000 * 1000,
+			track->stream_buf[track->index[pass].stream_pos+1]  / track->sample_clock * 1000 * 1000,
+			track->index[pass].index_counter);
 	}
 
 	/* Method to calculate the time between two indices:
@@ -334,29 +333,29 @@ int decode_flux(struct track *track)
 	pass = 0;
 	while (track->indices_idx && pass < (track->indices_idx - 1)) {
 		uint32_t flux_sum       = 0;
-		uint32_t index_pos      = track->indices[pass].stream_pos;
-		uint32_t next_index_pos = track->indices[pass+1].stream_pos;
+		uint32_t index_pos      = track->index[pass].stream_pos;
+		uint32_t next_index_pos = track->index[pass+1].stream_pos;
 
 
 		decode_pass(track, index_pos, next_index_pos, pass, &flux_sum);
 
 		log_dbg("[Phase 1: S:%x, T:%02u, PASS:%x] SAMPLE CLOCK: %0.3fus",
 			track->side, track->track, pass,
-			track->indices[pass].sample_counter / track->sample_clock * 1000 * 1000);
+			track->index[pass].sample_counter / track->sample_clock * 1000 * 1000);
 
 		log_dbg("[Phase 1: S:%x, T:%02u, PASS:%x] INDEX CLOCK:  %f (%f)",
 			track->side, track->track, pass,
-			track->indices[pass].index_counter/track->index_clock,
-			pass ? (track->indices[pass].index_counter - last_index_counter)/track->index_clock : 0.0);
+			track->index[pass].index_counter/track->index_clock,
+			pass ? (track->index[pass].index_counter - last_index_counter)/track->index_clock : 0.0);
 
-		uint32_t diff = flux_sum - last_sample_counter + track->indices[pass].sample_counter;
+		uint32_t diff = flux_sum - last_sample_counter + track->index[pass].sample_counter;
 		log_dbg("[Phase 1: S:%x, T:%02u, PASS:%u] Space between indices: %0.3fms; %0.3f RPM",
 			track->side, track->track, pass,
 			diff/track->sample_clock * 1000,
 			60/(diff/track->sample_clock));
 
-		last_index_counter  = track->indices[pass].index_counter;
-		last_sample_counter = track->indices[pass].sample_counter;
+		last_index_counter  = track->index[pass].index_counter;
+		last_sample_counter = track->index[pass].sample_counter;
 
 		pass++;
 	}
@@ -381,8 +380,8 @@ void free_stream(struct track *track)
 	bytestream_destroy(&(track->stream));
 	free(track->stats.error_rate);
 
-	free(track->indices);
-	track->indices = NULL;
+	free(track->index);
+	track->index = NULL;
 	track->indices_idx = 0;
 	track->indices_max = 1;
 }

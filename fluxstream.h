@@ -104,7 +104,7 @@ struct track {
 	uint8_t track;
 
 	// constructed from OOB data
-	struct index *indices;
+	struct index *index;
 	// buffer should be the ISB
 	uint32_t     *stream_buf;
 	// this is the parsed sample stream from the ISB

@@ -860,8 +860,8 @@ int decode_flux_to_mfm(struct disk *disk, struct track *track)
 
 	uint32_t pass = track->indices_idx - 1;
 
-	uint32_t first_index = track->indices[0].stream_pos;
-	uint32_t last_index  = track->indices[pass-1].stream_pos;
+	uint32_t first_index = track->index[0].stream_pos;
+	uint32_t last_index  = track->index[pass-1].stream_pos;
 
 	log_dbg("MFM [S:%x, T:%02u] Gonna decode flux stream: %x -- %x", track->side, track->track, first_index, last_index);
 	mfm_decode_passes(track, first_index, last_index);

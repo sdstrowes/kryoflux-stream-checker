@@ -77,12 +77,12 @@ void append_index(struct track *track, uint32_t stream_pos, uint32_t sample_coun
 {
 	if (track->indices_idx >= track->indices_max - 1) {
 		track->indices_max *= 2;
-		track->indices = (struct index *)realloc(track->indices, sizeof(struct index)*track->indices_max);
+		track->index = (struct index *)realloc(track->index, sizeof(struct index)*track->indices_max);
 	}
 
-	track->indices[track->indices_idx].stream_pos     = stream_pos;
-	track->indices[track->indices_idx].sample_counter = sample_counter;
-	track->indices[track->indices_idx].index_counter  = index_counter;
+	track->index[track->indices_idx].stream_pos     = stream_pos;
+	track->index[track->indices_idx].sample_counter = sample_counter;
+	track->index[track->indices_idx].index_counter  = index_counter;
 	track->indices_idx++;
 }
 
