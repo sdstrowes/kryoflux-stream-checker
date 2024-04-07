@@ -62,7 +62,7 @@ int parse_streaminfo(FILE *f, uint16_t size, uint32_t *stream_pos)
 	if (*stream_pos != oob_stream_pos) {
 		log_dbg("[%5x] Stream Info: pos:%08x; transfer time:%4ums", *stream_pos, oob_stream_pos, oob_transfer_time);
 		log_err("stream_pos[%05x] does not match information in OOB info block[%05x]", *stream_pos, oob_stream_pos);
-		return -1;
+//		return -1;
 //		log_err("WARNING: stream_pos:%06x does not match oob:%06x; resetting",
 //			*stream_pos, oob_stream_pos);
 //		*stream_pos = oob_stream_pos;
