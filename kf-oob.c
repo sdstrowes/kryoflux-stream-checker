@@ -91,7 +91,7 @@ void append_index(struct track *track, uint32_t stream_pos, uint32_t sample_coun
 // - 4 bytes stream position
 // - 4 bytes sample counter
 // - 4 bytes index counter
-int parse_oob_disk_index(FILE *f, struct track *track, uint16_t size, uint32_t *stream_pos)
+int parse_oob_disk_index(FILE *f, struct track *track, uint16_t size)
 {
 	int rc;
 
@@ -126,8 +126,8 @@ int parse_oob_disk_index(FILE *f, struct track *track, uint16_t size, uint32_t *
 		oob_stream_pos, oob_sample_counter, oob_index_counter);
 	append_index(track, oob_stream_pos, oob_sample_counter, oob_index_counter);
 
-	log_dbg("[%5x] Index block: stream_pos:%08x sample_counter:%08x index_counter:%08x",
-		*stream_pos, oob_stream_pos, oob_sample_counter, oob_index_counter);
+	log_dbg("Index block: stream_pos:%08x sample_counter:%08x index_counter:%08x",
+		oob_stream_pos, oob_sample_counter, oob_index_counter);
 
 	return 0;
 }
@@ -185,32 +185,31 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 
 	switch (type) {
 	case OOB_INVALID: {
-		log_dbg("Parse OOB type %02x: %s", type, "invalid");
+		log_dbg("OOB type %02x: %s", type, "invalid");
 		rc = parse_oob_invalid(size);
 		return rc;
 	}
 
 	case OOB_STREAMINFO: {
-		log_dbg("Parse OOB type %02x: %s", type, "stream read");
+		log_dbg("OOB type %02x: %s", type, "stream read");
 		rc = parse_streaminfo(f, size, stream_pos);
 		return rc;
 	}
 
 	case OOB_INDEX: {
-		log_dbg("Parse OOB type %02x: %s", type, "index");
-		rc = parse_oob_disk_index(f, track, size, stream_pos);
+		log_dbg("OOB type %02x: %s", type, "index");
+		rc = parse_oob_disk_index(f, track, size);
 		return rc;
 	}
 
 	case OOB_STREAMEND: {
-		log_dbg("Parse OOB type %02x: %s", type, "stream end");
+		log_dbg("OOB type %02x: %s", type, "stream end");
 		rc = parse_oob_stream_end(f, size, stream_pos);
 		return rc;
 	}
 
 	case OOB_KFINFO: {
-		log_dbg("SECTION OOB [%02x] kfinfo", type);
-		log_dbg("Parse OOB type %02x: %s", type, "kfinfo");
+		log_dbg("OOB type %02x: %s", type, "kfinfo");
 		struct kf_info info;
 		memset(&info, 0, sizeof(info));
 		parse_kf_info(f, size, &info);
@@ -220,7 +219,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 
 	// - size == 0x0d0d, not useful
 	case OOB_EOF: {
-		log_dbg("Parse OOB type %02x: %s", type, "index");
+		log_dbg("OOB type %02x: %s", type, "index");
 
 		if (size != OOB_EOF_SIZE) {
 			log_err("OOB EOF block has incorrect length: %04x (should be %04x)", size, OOB_EOF_SIZE);
@@ -232,8 +231,7 @@ int parse_oob(FILE *f, struct track *track, uint32_t *stream_pos)
 	}
 
 	default: {
-		log_dbg("SECTION OOB [%02x] default", type);
-		log_dbg("Parse OOB type %02x: %s", type, "unknown");
+		log_dbg("OOB type %02x: %s", type, "unknown");
 		log_err("Unknown OOB type %x", type);
 		return -1;
 	}
