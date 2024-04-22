@@ -306,9 +306,6 @@ int decode_flux(struct track *track)
 {
 	uint32_t pass;
 
-	uint32_t last_index_counter  = 0;
-	uint32_t last_sample_counter = 0;
-
 	track->stats.pass_count_max = PASS_COUNT_DEFAULT;
 	track->stats.error_rate     = (double *)malloc(sizeof(double)*PASS_COUNT_DEFAULT);
 
@@ -330,8 +327,8 @@ int decode_flux(struct track *track)
 	 * field in Index Block) and subtracting the Sample Counter value of
 	 * the previous index.
 	 */
-	pass = 0;
-	while (track->indices_idx && pass < (track->indices_idx - 1)) {
+	for (pass = 0 ; pass < track->indices_idx - 1; pass++) {
+	//while (track->indices_idx && pass < (track->indices_idx - 1)) {
 		uint32_t flux_sum       = 0;
 		uint32_t index_pos      = track->index[pass].stream_pos;
 		uint32_t next_index_pos = track->index[pass+1].stream_pos;
@@ -346,18 +343,13 @@ int decode_flux(struct track *track)
 		log_dbg("[Phase 1: S:%x, T:%02u, PASS:%x] INDEX CLOCK:  %f (%f)",
 			track->side, track->track, pass,
 			track->index[pass].index_counter/track->index_clock,
-			pass ? (track->index[pass].index_counter - last_index_counter)/track->index_clock : 0.0);
+			(track->index[pass+1].index_counter - track->index[pass].index_counter)/track->index_clock);
 
-		uint32_t diff = flux_sum - last_sample_counter + track->index[pass].sample_counter;
+		uint32_t diff = flux_sum + track->index[pass+1].sample_counter - track->index[pass].sample_counter;
 		log_dbg("[Phase 1: S:%x, T:%02u, PASS:%u] Space between indices: %0.3fms; %0.3f RPM",
 			track->side, track->track, pass,
 			diff/track->sample_clock * 1000,
 			60/(diff/track->sample_clock));
-
-		last_index_counter  = track->index[pass].index_counter;
-		last_sample_counter = track->index[pass].sample_counter;
-
-		pass++;
 	}
 
 	uint16_t i = 0;

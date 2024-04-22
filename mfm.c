@@ -858,16 +858,33 @@ int decode_flux_to_mfm(struct disk *disk, struct track *track)
 //			60/(diff/track->sample_clock));
 //	}
 
-	uint32_t pass = track->indices_idx - 1;
+// For each Index Signal:
+//  * The Stream Position points to the position of the next flux reversal in the stream buffer.
+//  * The Sample Counter value indicates how far from the beginning of the previous flux reversal the index is detected.
 
-	uint32_t first_index = track->index[0].stream_pos;
-	uint32_t last_index  = track->index[pass-1].stream_pos;
+	log_dbg("Indices idx: %u, indices max: %u", track->indices_idx, track->indices_max);
+	uint i;
+//	for (i = 0; i < track->indices_max; i++) {
+	for (i = 0; i < 1; i++) {
+		log_dbg("foo: next flux reversal:%08x distance fro last flux reversal:%08x index_counter:%08x",
+			track->index[i].stream_pos,
+			track->index[i].sample_counter,
+			track->index[i].index_counter);
 
-	log_dbg("MFM [S:%x, T:%02u] Gonna decode flux stream: %x -- %x", track->side, track->track, first_index, last_index);
-	mfm_decode_passes(track, first_index, last_index);
+		uint32_t index_counter_delta = track->index[i+1].index_counter - track->index[i].index_counter;
+		log_dbg("idx counter delta: %u, clock: %f", index_counter_delta, index_counter_delta / track->index_clock);
 
-	log_dbg("MFM [S:%x, T:%02u] Gonna parse the data out", track->side, track->track);
-	parse_data_stream(disk, track);
+		uint32_t pass = track->indices_idx - 1;
+
+		uint32_t first_index = track->index[i].stream_pos;
+		uint32_t last_index  = track->index[i+1].stream_pos;
+
+		log_dbg("MFM [S:%x, T:%02u] Gonna decode flux stream: %x -- %x", track->side, track->track, first_index, last_index);
+		mfm_decode_passes(track, first_index, last_index);
+	}
+
+//	log_dbg("MFM [S:%x, T:%02u] Gonna parse the data out", track->side, track->track);
+//	parse_data_stream(disk, track);
 
 	return 0;
 }
