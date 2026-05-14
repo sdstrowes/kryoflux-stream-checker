@@ -1,26 +1,31 @@
-TARGET = disk-analysis
-LIBS =
-INCS =
-CC = gcc
-CFLAGS = -g -Wall -Wextra
+TARGET  = disk-analysis
+CC      = gcc
+CFLAGS  = -W -Wall -Wextra -g
+LDFLAGS = -lncurses
 
-.PHONY: default all clean
+SRCS = disk-analysis.c \
+       disk-analysis-log.c \
+       mfm.c \
+       fluxstream.c \
+       input.c \
+       kf-info.c \
+       kf-oob.c \
+       atari-fs.c
 
-default: $(TARGET)
-all: default
+OBJS = $(SRCS:.c=.o)
+DEPS = $(SRCS:.c=.d)
 
-OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
-HEADERS = $(wildcard *.h)
+.PHONY: all clean
 
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) $(INCS) -c $< -o $@
+all: $(TARGET)
 
-.PRECIOUS: $(TARGET) $(OBJECTS)
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-$(TARGET): $(OBJECTS)
-	$(CC) $(OBJECTS) -Wall $(LIBS) -o $@
+%.o: %.c
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
+
+-include $(DEPS)
 
 clean:
-	-rm -f *.o
-	-rm -f $(TARGET)
-
+	rm -f $(OBJS) $(DEPS) $(TARGET)
