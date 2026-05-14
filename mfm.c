@@ -427,29 +427,8 @@ int parse_data(struct disk *disk, struct sector *sector, struct bytestream *stre
 		rc++;
 	}
 
-	int i;
-	for (i = 0; i < length_bytes; i++) {
-		if (!(i % 8)) {
-			printf("\nDATA2 %02x/%02x/%02x %03x:",
-			sector->meta.side,
-			sector->meta.track,
-			sector->meta.sector_num,
-			i);
-		}
-		printf(" %02x", data_bytes[i]);
-	}
-	printf("\n");
-
 	sector->data.data     = data_bytes;
 	sector->data.data_len = length_bytes;
-
-	printf("DATA:");
-	//int i;
-	//for (i = 0; i < 156; i++) {
-	//	printf("\n %u %u\n", length_bytes, i);
-	//	printf(" %02x", disk->side[sector->meta.side].track[sector->meta.track].sector[sector->meta.sector_num].data.data[i]);
-	//}
-	//printf("\n");
 
 	uint8_t crc[2];
 	bytestream_get_location(stream, location, crc, 2);
@@ -540,8 +519,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 	parser_state = UNSYNCED;
 	i = 0;
 
-	struct sector *sector     = NULL;
-	bool           good_parse = false;
+	struct sector *sector = NULL;
 
 	while (parser_state != TRACK_COMPLETE) {
 		switch (parser_state) {
@@ -696,9 +674,9 @@ void parse_data_stream(struct disk *disk, struct track *track)
 
 		case FOUND_DATA: {
 			log_dbg("parser_state [%u] found data", parser_state);
-			int rc = parse_data(disk, sector, stream, i, 512);
+			int rc = parse_data(disk, sector, stream, i, sector->meta.size);
 			log_dbg("[parsed data field; %u bytes", rc);
-			if (rc != 512 + 1 + 2) {
+			if (rc != sector->meta.size + 1 + 2) {
 				if (sector->data.disk_crc != sector->data.calc_crc) {
 					char tmp[LINE_MAX];
 					memset(tmp, '\0', LINE_MAX);
@@ -761,7 +739,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 	}
 	log_dbg("parser_state [%u] exiting, track complete", parser_state);
 
-	if (sector != NULL && !good_parse) {
+	if (sector != NULL) {
 		free(sector->data.data);
 		free(sector);
 		sector = NULL;
