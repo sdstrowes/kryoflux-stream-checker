@@ -343,8 +343,14 @@ static void list_dir(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
 		char ts[17];
 		format_timestamp(e, ts);
 
+		char fullname[15];
+		if (attr & ATTR_SUBDIR)
+			snprintf(fullname, sizeof(fullname), "%s/", name);
+		else
+			snprintf(fullname, sizeof(fullname), "%s", name);
+
 		if (attr & ATTR_SUBDIR) {
-			printf("%s%s/  %s  %s\n", indent, name, attrs, ts);
+			printf("%s%-13s  %s  %s\n", indent, fullname, attrs, ts);
 			if (depth < MAX_DIR_DEPTH - 1 && first_cluster >= 2) {
 				uint32_t sub_size;
 				uint8_t *sub_buf = read_dir_data(disk_data, bpb, fat,
@@ -355,7 +361,7 @@ static void list_dir(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
 				}
 			}
 		} else {
-			printf("%s%s  %s  %s  %u bytes\n", indent, name, attrs, ts, file_size);
+			printf("%s%-13s  %s  %s  %7u bytes\n", indent, fullname, attrs, ts, file_size);
 		}
 	}
 }
