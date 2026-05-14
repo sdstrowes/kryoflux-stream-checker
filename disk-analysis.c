@@ -7,6 +7,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#include "atari-fs.h"
 #include "disk-analysis-log.h"
 #include "fluxstream.h"
 #include "input.h"
@@ -264,6 +265,13 @@ int main(int argc, char *argv[])
 	parse_atari_mfm_from_flux(&disk, &disk_data);
 
 	consolidate_sectors(&disk, &disk_data);
+
+	struct bpb bpb;
+	if (parse_boot_sector(&disk_data, &bpb) != 0) {
+		log_err("Failed to parse boot sector");
+		return 1;
+	}
+	print_bpb(&bpb);
 
 	free_struct_disk(&disk);
 
