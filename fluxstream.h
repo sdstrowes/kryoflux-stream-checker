@@ -22,14 +22,14 @@ typedef uint32_t flux_t;
 
 
 #define STREAM_BUFFER_SIZE 4194304
-#define STREAM_RECENT_WINDOW 48
+//#define STREAM_RECENT_WINDOW 48
 struct bytestream
 {
 	uint8_t stream[STREAM_BUFFER_SIZE];
-	uint8_t recent[STREAM_RECENT_WINDOW];
+//	uint8_t recent[STREAM_RECENT_WINDOW];
 	double  time_idx[STREAM_BUFFER_SIZE];
 	uint32_t ptr;
-	uint8_t subptr;
+//	uint8_t subptr;
 };
 
 
@@ -91,6 +91,10 @@ struct disk {
 	struct track_array side[2];
 };
 
+struct flux_entry {
+	flux_t   val;
+//	uint32_t stream_pos;
+};
 
 struct track {
 	double   master_clock;
@@ -105,15 +109,19 @@ struct track {
 
 	// constructed from OOB data
 	struct index *index;
-	// buffer should be the ISB
-	uint32_t     *stream_buf;
+	uint8_t *isb;
+
+	// this is the in-stream buffer
+	struct flux_entry *flux_buffer;
 	// this is the parsed sample stream from the ISB
 	uint16_t     *sample_stream;
 
 	uint32_t     indices_idx;
 	uint32_t     indices_max;
-	uint32_t     stream_buf_idx;
-	uint32_t     stream_buf_max;
+	uint32_t     flux_buf_idx;
+	uint32_t     flux_buf_max;
+	uint32_t     isb_idx;
+	uint32_t     isb_max;
 
 	struct sector sector[MAX_SECTORS];
 	LIST_HEAD(sector_list, sector) sectors;
@@ -123,7 +131,8 @@ struct track {
 };
 
 
-int  parse_flux_stream(char *, struct track *, uint8_t side, uint8_t track);
+uint32_t append_stream(struct track *track, flux_t flux_val, uint32_t flux_buffer_pos);
+int  parse_flux_stream(struct track *, uint8_t side, uint8_t track);
 int  decode_flux(struct track *);
 void dump_stream(struct track *);
 void free_stream(struct track *);

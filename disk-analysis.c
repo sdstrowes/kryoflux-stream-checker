@@ -8,8 +8,9 @@
 #include <unistd.h>
 
 #include "disk-analysis-log.h"
-#include "mfm.h"
 #include "fluxstream.h"
+#include "input.h"
+#include "mfm.h"
 
 #include <sys/queue.h>
 
@@ -29,21 +30,33 @@ void print_help(char *binary_name)
 	printf(" -h: this help\n");
 }
 
-struct track_data {
-	struct track t;
-	STAILQ_ENTRY(track_data) next;
+//struct track_data {
+//	struct track t;
+//	STAILQ_ENTRY(track_data) next;
+//};
+//STAILQ_HEAD(side, track_data);
+
+struct side {
+	struct track t[TRACK_MAX];
 };
-STAILQ_HEAD(side, track_data);
 
 struct disk_streams {
-	struct side side[2];
+	struct side side[SIDES];
 	char *name_prefix;
 };
 
 void init_struct_disk(struct disk_streams *disk, char *name_prefix)
 {
-	STAILQ_INIT(&disk->side[0]);
-	STAILQ_INIT(&disk->side[1]);
+//	STAILQ_INIT(&disk->side[0]);
+//	STAILQ_INIT(&disk->side[1]);
+
+	int s, t;
+	for (s = 0; s < SIDES; s++) {
+		for (t = 0; t < TRACK_MAX; t++) {
+			memset(&disk->side[s].t[t], 0, sizeof(struct track));
+		}
+	}
+	//memset(&disk->side[0])
 
 	disk->name_prefix = name_prefix;
 }
@@ -52,21 +65,21 @@ void free_struct_disk(struct disk_streams *disk)
 {
 	int side;
 	for (side = 0; side < SIDES; side++) {
-		while (!STAILQ_EMPTY(&disk->side[side])) {
-			struct track_data *track = STAILQ_FIRST(&disk->side[side]);
-
-			while (!LIST_EMPTY(&(track->t.sectors))) {
-				struct sector *sector = LIST_FIRST(&(track->t.sectors));
-				LIST_REMOVE(sector, next);
-				free(sector->data.data);
-				free(sector);
-			}
-
-			free_stream(&(track->t));
-
-			STAILQ_REMOVE_HEAD(&disk->side[side], next);
-			free(track);
-		}
+//		while (!STAILQ_EMPTY(&disk->side[side])) {
+//			struct track_data *track = STAILQ_FIRST(&disk->side[side]);
+//
+//			while (!LIST_EMPTY(&(track->t.sectors))) {
+//				struct sector *sector = LIST_FIRST(&(track->t.sectors));
+//				LIST_REMOVE(sector, next);
+//				free(sector->data.data);
+//				free(sector);
+//			}
+//
+//			free_stream(&(track->t));
+//
+//			STAILQ_REMOVE_HEAD(&disk->side[side], next);
+//			free(track);
+//		}
 	}
 }
 
@@ -92,27 +105,71 @@ char *construct_filename(char *prefix, int side, int track)
 	return fn;
 }
 
+int check_index_information(struct track *track, int side, int track_num)
+{
+	uint32_t i;
+	for (i = 0; i + 1 < track->indices_idx; i++) {
+		struct index *this_index = &track->index[i];
+		struct index *next_index = &track->index[i+1];
+		log_dbg("### i:%u, side:%u, track:%u: index: stream_pos:%u, sample_counter:%u, index_counter:%u",
+			i, side, track_num,
+			this_index->stream_pos,
+			this_index->sample_counter,
+			this_index->index_counter);
 
-void parse_disk_fluxes_from_files(struct disk_streams *disk)
+		log_dbg("### starting stream_pos:%x, ending_stream_pos:%x", this_index->stream_pos, next_index->stream_pos);
+//		uint32_t s;
+//		for (s = this_index->stream_pos; s < next_index->stream_pos; s++) {
+//			printf("%02x %08x %04x %04x\n", i, s, track->isb[s], track->flux_buffer[s].val);
+//		}
+
+	}
+
+	return 0;
+
+}
+
+//void parse_flux_values_from_isb(struct disk_streams *disk)
+//{
+//	int track;
+//	int side;
+//
+//	for (side = 0; side < SIDES; side++) {
+//		for (track = 0; track < TRACK_MAX; track++) {
+//			int rc = parse_buffers_from_raw(&disk->side[side].t[track], side, track);
+//			if (!rc) {
+//				decode_flux(&disk->side[side].t[track]);
+//				//STAILQ_INSERT_TAIL(&disk->side[side], track_data, next);
+//			}
+//			else {
+//				log_dbg("Error parsing ISB from side:%u, track:%02d", side, track);
+//				//free(track_data);
+//			}
+//		}
+//	}
+//}
+
+void parse_buffers_from_files(struct disk_streams *disk)
 {
 	int track;
 	int side;
 
 	for (side = 0; side < SIDES; side++) {
 		for (track = 0; track < TRACK_MAX; track++) {
-			struct track_data *track_data = malloc(sizeof(struct track_data));
+			//struct track_data *track_data = malloc(sizeof(struct track_data));
+			struct track *track_data = &disk->side[side].t[track];
 
 			char *fn = construct_filename(disk->name_prefix, side, track);
 
-			int rc = parse_flux_stream(fn, &track_data->t, side, track);
+			int rc = parse_buffers_from_raw(fn, track_data, side, track);
 			if (!rc) {
 				log_dbg("Loaded %s", fn);
-				decode_flux(&track_data->t);
-				STAILQ_INSERT_TAIL(&disk->side[side], track_data, next);
+				decode_flux(track_data);
+				//STAILQ_INSERT_TAIL(&disk->side[side], track_data, next);
+				check_index_information(track_data, side, track);
 			}
 			else {
 				log_dbg("Error reading %s", fn);
-				free(track_data);
 			}
 
 			free(fn);
@@ -120,13 +177,13 @@ void parse_disk_fluxes_from_files(struct disk_streams *disk)
 	}
 }
 
+
 void parse_atari_mfm_from_flux(struct disk_streams *disk, struct disk *disk_data)
 {
-	int side;
-	for (side = 0; side < SIDES; side++) {
-		struct track_data *track;
-		STAILQ_FOREACH(track, &disk->side[side], next) {
-			decode_flux_to_mfm(disk_data, &track->t);
+	int s, t;
+	for (s = 0; s < SIDES; s++) {
+		for (t = 0; t < TRACK_MAX; t++) {
+			decode_flux_to_mfm(disk_data, &disk->side[s].t[t]);
 		}
 	}
 }
@@ -167,7 +224,9 @@ int main(int argc, char *argv[])
 	struct disk_streams disk;
 	init_struct_disk(&disk, fn_prefix);
 
-	parse_disk_fluxes_from_files(&disk);
+	parse_buffers_from_files(&disk);
+
+	//parse_buffers_from_files(&disk);
 
 	parse_atari_mfm_from_flux(&disk, &disk_data);
 

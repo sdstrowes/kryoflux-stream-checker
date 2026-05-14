@@ -1,3 +1,4 @@
+#include <arpa/inet.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -17,9 +18,9 @@ void bytestream_init(struct bytestream **s)
 
 	memset(stream->stream,   STREAM_BUFFER_SIZE,   sizeof(stream->stream));
 	memset(stream->time_idx, STREAM_BUFFER_SIZE,   sizeof(stream->time_idx));
-	memset(stream->recent,   STREAM_RECENT_WINDOW, sizeof(stream->recent));
+//	memset(stream->recent,   STREAM_RECENT_WINDOW, sizeof(stream->recent));
 	stream->ptr = 0;
-	stream->subptr = 0;
+//	stream->subptr = 0;
 
 	*s = stream;
 }
@@ -113,53 +114,59 @@ uint8_t test_sync_patterns(struct bytestream *stream, int location, bool debug)
 	return MARKER_UNKNOWN;
 }
 
+void print_hex(char *buffer, uint8_t *val, int n)
+{
+	int i;
+	char *ptr = buffer;
+	for (i = 0; i < n; i++) {
+    /* "sprintf" converts each byte in the "buf" array into a 2 hex string
+     * characters appended with a null byte, for example 10 => "0A\0".
+     *
+     * This string would then be added to the output array starting from the
+     * position pointed at by "ptr". For example if "ptr" is pointing at the 0
+     * index then "0A\0" would be written as output[0] = '0', output[1] = 'A' and
+     * output[2] = '\0'.
+     *
+     * "sprintf" returns the number of chars in its output excluding the null
+     * byte, in our case this would be 2. So we move the "ptr" location two
+     * steps ahead so that the next hex string would be written at the new
+     * location, overriding the null byte from the previous hex string.
+     *
+     * We don't need to add a terminating null byte because it's been already 
+     * added for us from the last hex string. */  
+	    ptr += sprintf(ptr, "%02X", val[i]);
+	}
+}
+
 void bytestream_push(struct bytestream *stream, uint8_t val, int bits, uint8_t track_num, uint8_t side_num, uint32_t idx, double time_index)
 {
-	char buffer[9];
-	buffer[8] = '\0';
-	print_bin(buffer, stream->stream[stream->ptr], 8);
 
+	uint32_t index = stream->ptr / 8;
+	uint32_t subidx = stream->ptr % 8;
 
-	int i;
-	uint16_t slider = stream->recent[0] << bits;
+//	log_dbg("bytestream_push: ptr:%u index:%u  subidx:%u", stream->ptr, index, subidx);
 
-	for (i = 1; i < STREAM_RECENT_WINDOW; i++) {
-		slider = (slider << 8) | (stream->recent[i] << bits);
-		uint8_t tmp = slider >> 8;
-		stream->recent[i-1] = tmp;
-	}
-	stream->recent[i-1] = (0x00ff & slider) | val;
+	uint16_t tmpslice;
+	memcpy(&tmpslice, (stream->stream)+index, sizeof(uint16_t));
+	uint16_t slice = htons(tmpslice);
 
-	if (stream->subptr + bits >= 8) {
-		// The pattern is always N zeroes then a 1, so...
+	uint16_t tmpval = val << (16 - bits);
+	slice = slice | (tmpval >> subidx);
 
-		uint8_t bits_remaining = 8 - stream->subptr;
+	tmpslice = htons(slice);
+	memcpy( (stream->stream)+index, &tmpslice, sizeof(uint16_t));
 
-		if (bits_remaining == bits) {
-			uint8_t byte = stream->stream[stream->ptr];
-			byte = byte | val;
-			stream->stream[stream->ptr] = byte;
-			stream->time_idx[stream->ptr] = time_index;
-		}
+	//debug
+//	{
+//		char dbg_buffer[index * 2 + 2];
+//		dbg_buffer[index * 2 + 2] = '\0';
+//		print_hex(dbg_buffer, stream->stream, index + 1);
+//		log_dbg("stream--> %s", dbg_buffer);
+//	}
 
-		print_d_c_vals(stream->stream[stream->ptr], side_num, track_num, idx);
+	stream->ptr += bits;
 
-		stream->ptr++;
-		stream->subptr = 0;
-		bits -= bits_remaining;
-	}
-
-	if (stream->subptr + bits < 8) {
-		val = val << (8 - stream->subptr - bits);
-
-		uint8_t byte = stream->stream[stream->ptr];
-
-		byte = byte | val;
-		stream->stream[stream->ptr] = byte;
-		stream->subptr += bits;
-	}
-
-	print_bin(buffer, stream->stream[stream->ptr], 8);
+//	print_bin(dbg_buffer, stream->stream[stream->ptr], 8);
 }
 
 void separate_data_clock(uint8_t *data, uint8_t *d, uint8_t *c)
@@ -268,11 +275,17 @@ int parse_id_record(struct sector *sector, struct bytestream *stream, int locati
 
 	sector->meta.calc_crc = crc;
 
+	log_msg("ID record: track:  %u", sector->meta.track);
+	log_msg("ID record: side:   %u", sector->meta.side);
+	log_msg("ID record: sector: %u", sector->meta.sector_num);
+	log_msg("ID record: size:   %u", sector->meta.size);
+
 	if (sector->meta.disk_crc != crc) {
+		log_err("ID record: CRC mismatch; expected %x, got %x", sector->meta.calc_crc, sector->meta.disk_crc);
 		return -1;
 	}
 
-
+	log_msg("ID record: CRC %04x OK", sector->meta.disk_crc);
 	return 0;
 }
 
@@ -393,7 +406,7 @@ int parse_data(struct disk *disk, struct sector *sector, struct bytestream *stre
 		bytestream_get_location(stream, location, data, 2);
 		separate_data_clock(data, &d, &c);
 
-		log_msg("[DATA %02x %02x %02x %u] %u/%u: %02x",
+		log_msg("DATA  %02x/%02x/%02x loc:%x] rc:%u length:%u: data:%02x",
 			sector->meta.side,
 			sector->meta.track,
 			sector->meta.sector_num,
@@ -414,7 +427,7 @@ int parse_data(struct disk *disk, struct sector *sector, struct bytestream *stre
 	int i;
 	for (i = 0; i < 512; i++) {
 		if (!(i % 8)) {
-			printf("\nDATA2 %x/%02x/%02x %03x:",
+			printf("\nDATA2 %02x/%02x/%02x %03x:",
 			sector->meta.side,
 			sector->meta.track,
 			sector->meta.sector_num,
@@ -455,8 +468,10 @@ int parse_data(struct disk *disk, struct sector *sector, struct bytestream *stre
 
 void shift_bytestream(struct bytestream *old_stream, uint32_t start_bit, struct bytestream *new_stream)
 {
+	log_dbg("called shift_bytestream: doin this janky thing");
+
 	uint32_t bit = start_bit;
-	for ( ; bit < (8*old_stream->ptr)+old_stream->subptr; bit += 8) {
+	for ( ; bit < old_stream->ptr; bit += 8) {
 		uint8_t tmp;
 		double  timer;
 		bytestream_get_location(old_stream, bit, &tmp, 1);
@@ -464,6 +479,7 @@ void shift_bytestream(struct bytestream *old_stream, uint32_t start_bit, struct 
 		bytestream_push(new_stream, tmp, 8, 0, 0, 0, timer);
 	}
 
+	log_dbg("exiting shift_bytestream: todo: check whether we capture last byte");
 }
 
 
@@ -526,17 +542,17 @@ void parse_data_stream(struct disk *disk, struct track *track)
 	while (parser_state != TRACK_COMPLETE) {
 		switch (parser_state) {
 		case UNSYNCED: {
+			log_dbg("parser_state: UNSYNCED (%u)", parser_state);
 			int found_marker = 0;
 
-			log_dbg("Going to try to byte-align; range: 0000 .. %04x(%04x)", stream->ptr, stream->subptr);
+			log_dbg("Going to try to byte-align; bitptr %04x", stream->ptr);
 
 			/* Scan forward to find a sector marker; use this to byte-align */
-			for (bit = 0; bit < (8*stream->ptr)+stream->subptr; bit++) {
-			//for (bit = i; bit < (8*stream->ptr)+stream->subptr; bit++) {
+			for (bit = 0; bit < stream->ptr; bit++) {
 				uint8_t code = test_sync_patterns(stream, bit, false);
 				switch (code) {
 				case MARKER_PRE: {
-					log_dbg("I FOUND A PRE-INDEX MARKER AT BIT %04x", bit);
+					log_dbg("Found: Gap 2a (pre-index marker) at bit %04x", bit);
 					struct bytestream *shifted_bytestream;
 					bytestream_init(&shifted_bytestream);
 					shift_bytestream(stream, bit, shifted_bytestream);
@@ -547,7 +563,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 
 					//i = bit;
 					// Get out of here
-					bit = (8*stream->ptr)+stream->subptr;
+					bit = stream->ptr;
 					found_marker = 1;
 
 					parser_state = SEEKING_PRE_ID;
@@ -566,10 +582,11 @@ void parse_data_stream(struct disk *disk, struct track *track)
 		}
 
 		case SEEKING_PRE_ID: {
+			log_dbg("parser_state [%u] seeking pre ID", parser_state);
 			//stream = track->stream;
-			log_dbg("I think I'm byte-aligned; at bit %04x in range: 0000 .. %04x", i, stream->ptr*8 + stream->subptr);
+			log_dbg("I think I'm byte-aligned; at bit %04x", stream->ptr);
 
-			for (; i < stream->ptr*8; i++) {
+			for (; i < stream->ptr; i++) {
 				uint8_t code = test_sync_patterns(stream, i, true);
 				//switch (code) {
 				//case MARKER_PRE: {
@@ -587,7 +604,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 				//}
 			}
 
-			if (i >= stream->ptr*8) {
+			if (i >= stream->ptr) {
 				parser_state = TRACK_COMPLETE;
 			}
 			if (sector == NULL) {
@@ -600,6 +617,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 		}
 
 		case FOUND_ID: {
+			log_dbg("parser_state [%u] found ID", parser_state);
 			//parse_sector(stream, &i);
 			log_dbg("IN:  FOUND_ID: i: %x", i);
 			int rc = parse_id_record(sector, stream, i);
@@ -636,6 +654,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 		}
 
 		case SEEKING_POST_ID: {
+			log_dbg("parser_state [%u] seeking post ID", parser_state);
 			int rc = parse_gap_3a(stream, i);
 			i += rc * 8 * 2;
 			log_dbg("[parsed ID record post-mark: %u 0x4e's]", rc);
@@ -646,6 +665,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 		}
 
 		case SEEKING_DATA: {
+			log_dbg("parser_state [%u] seeking data", parser_state);
 			int rc = parse_sync_mark(stream, i);
 			log_dbg("[parsed zero gap: %u 0x00's]", rc);
 			i += rc * 8 * 2;
@@ -672,6 +692,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 		}
 
 		case FOUND_DATA: {
+			log_dbg("parser_state [%u] found data", parser_state);
 			int rc = parse_data(disk, sector, stream, i, 512);
 			log_dbg("[parsed data field; %u bytes", rc);
 			if (rc != 512 + 1 + 2) {
@@ -705,6 +726,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 		}
 
 		case SEEKING_POST_DATA: {
+			log_dbg("parser_state [%u]  seeking post-data", parser_state);
 			int rc = parse_gap_4(stream, i);
 			log_dbg("[parsed %u 0x4e's]", rc);
 			if (rc != 40) {
@@ -729,11 +751,12 @@ void parse_data_stream(struct disk *disk, struct track *track)
 		}
 
 		default: {
+			log_dbg("parser_state: UNKNOWN (%u)", parser_state);
 			log_err("welp");
 		}
 		}
-
 	}
+	log_dbg("parser_state [%u] exiting, track complete", parser_state);
 
 	if (sector != NULL && !good_parse) {
 		free(sector->data.data);
@@ -756,15 +779,15 @@ void count_flux_sum(struct track *track, uint32_t index, uint32_t next_index, ui
 	 * field in Index Block) and subtracting the Sample Counter value of
 	 * the previous index.
 	 */
-	while (index < next_index && index < track->stream_buf_idx) {
+	while (index < next_index && index < track->flux_buf_idx) {
 		index++;
 		//double flux_us = track->stream_buf[index] / track->sample_clock;
-		*flux_sum += track->stream_buf[index];
+		*flux_sum += track->flux_buffer[index].val;
 	}
 
 	// Decoder must manually insert an empty flux at the end.
 	if (index != next_index) {
-		log_err("MFMTRACK [Phase 1: S:%x, T:%02u, PASS:%u, next_index:%5x] NOT FOUND, AT END? %x %x",
+		log_err("MFMTRACK [Count flux sum: S:%x, T:%02u, PASS:%u, next_index:%5x] NOT FOUND, AT END? %x %x",
 			track->side, track->track, pass, next_index, index-1, next_index);
 	}
 }
@@ -773,19 +796,28 @@ int mfm_decode_passes(struct track *track, uint32_t index, uint32_t next_index)
 {
 	//uint32_t flux_count = 0;
 
-	if (index >= track->stream_buf_idx) {
+	if (index >= track->flux_buf_idx) {
 		log_err("MFMTRACK [S:%x, T:%02u] WARNING: SEEK ERROR ON STREAM_POS %x", track->side, track->track, index);
 		return index;
 	}
 
+	if (track->stream != NULL) {
+		bytestream_destroy(&track->stream);
+	}
 	struct bytestream *stream;
 	bytestream_init(&stream);
 	track->stream = stream;
 
 	double time_index = 0.0;
 
-	while (index < next_index && index < track->stream_buf_idx) {
-		double flux_us = track->stream_buf[index] / track->sample_clock;
+	int debug_limit = index + 16;
+
+	while (index < next_index && index < track->flux_buf_idx) {
+		double flux_us = track->flux_buffer[index].val / track->sample_clock;
+
+		if (index < debug_limit) {
+			printf("doing something!\n");
+		}
 
 		time_index += flux_us;
 		index++;
@@ -801,14 +833,14 @@ int mfm_decode_passes(struct track *track, uint32_t index, uint32_t next_index)
 		else if (flux_us > 0.0000074 && flux_us < 0.0000086) {
 			bytestream_push(stream, 0x00000001, 4, track->side, track->track, index, time_index);
 		}
-//		else {
-//			log_dbg("[side:%u, track:%u] Trying to parse %0.7f", track->side, track->track, flux_us);
-//		}
+		else {
+			log_dbg("[side:%u, track:%u] Trying to parse %0.7f", track->side, track->track, flux_us);
+		}
 	}
 
 	// Decoder must manually insert an empty flux at the end.
 	if (index != next_index) {
-		log_err("MFMTRACK [Phase 1: S:%x, T:%02u, next_index:%5x] NOT FOUND, AT END? %x %x",
+		log_err("MFMTRACK [decoder: S:%x, T:%02u, next_index:%5x] NOT FOUND, AT END? %x %x",
 			track->side, track->track, next_index, index-1, next_index);
 	}
 
@@ -865,7 +897,7 @@ int decode_flux_to_mfm(struct disk *disk, struct track *track)
 	log_dbg("Indices idx: %u, indices max: %u", track->indices_idx, track->indices_max);
 	uint i;
 //	for (i = 0; i < track->indices_max; i++) {
-	for (i = 0; i < 1; i++) {
+	for (i = 0; i + 1 < track->indices_idx; i++) {
 		log_dbg("foo: next flux reversal:%08x distance fro last flux reversal:%08x index_counter:%08x",
 			track->index[i].stream_pos,
 			track->index[i].sample_counter,
@@ -883,8 +915,8 @@ int decode_flux_to_mfm(struct disk *disk, struct track *track)
 		mfm_decode_passes(track, first_index, last_index);
 	}
 
-//	log_dbg("MFM [S:%x, T:%02u] Gonna parse the data out", track->side, track->track);
-//	parse_data_stream(disk, track);
+	log_dbg("MFM [S:%x, T:%02u] Gonna parse the data out", track->side, track->track);
+	parse_data_stream(disk, track);
 
 	return 0;
 }

@@ -2,6 +2,7 @@
 #define __KFINFO_H__
 
 #include <stdint.h>
+#include <stdio.h>
 
 #define BUF_SIZE 64
 

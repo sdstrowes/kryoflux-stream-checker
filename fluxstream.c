@@ -1,6 +1,5 @@
 #include <errno.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -24,38 +23,34 @@ void sector_init(struct sector **s)
 }
 
 
-
-void append_stream(struct track *track, flux_t flux_val, uint32_t stream_pos)
+uint32_t append_stream(struct track *track, flux_t flux_val, uint32_t flux_buffer_pos)
 {
-	if (stream_pos >= track->stream_buf_max - 1) {
-		uint32_t old_max = track->stream_buf_max;
-		track->stream_buf_max *= 2;
+	if (flux_buffer_pos >= track->flux_buf_max - 1) {
+		uint32_t old_max = track->flux_buf_max;
+		track->flux_buf_max *= 2;
 
-		flux_t *tmp = (flux_t *)calloc(track->stream_buf_max, sizeof(flux_t));
-		if (track->stream_buf != NULL) {
-			memcpy(tmp, track->stream_buf, old_max*sizeof(flux_t));
-			free(track->stream_buf);
+		struct flux_entry *tmp = (struct flux_entry *)calloc(track->flux_buf_max, sizeof(struct flux_entry));
+		if (track->flux_buffer != NULL) {
+			memcpy(tmp, track->flux_buffer, old_max*sizeof(struct flux_entry));
+			free(track->flux_buffer);
 		}
-		track->stream_buf = tmp;
+		track->flux_buffer = tmp;
 	}
 
-	track->stream_buf[stream_pos] = flux_val;
+	track->flux_buffer[flux_buffer_pos].val = flux_val;
 
 	// idx becomes a marker for the last entry in the array
-	track->stream_buf_idx = stream_pos;
+	track->flux_buf_idx = flux_buffer_pos;
+
+	//*flux_buffer_pos = *flux_buffer_pos + 1;
+
+	return flux_buffer_pos + 1;
 }
 
 
-int parse_flux2(FILE *f, struct track *track, uint8_t header_val, bool ovl16, uint32_t stream_pos)
+int parse_flux2(struct track *track, uint8_t header_val, bool ovl16, uint32_t stream_pos, uint32_t flux_buffer_pos)
 {
-	uint8_t val;
-	int rc;
-
-	rc = fread(&val, 1, 1, f);
-	if (rc < 1) {
-		log_err("fread() fail");
-		exit(1);
-	}
+	uint8_t val = track->isb[stream_pos];
 
 	flux_t fluxval = (header_val << 8) + val;
 	if (ovl16) {
@@ -65,177 +60,33 @@ int parse_flux2(FILE *f, struct track *track, uint8_t header_val, bool ovl16, ui
 	log_dbg("flux2: header: %02x value:%02x", header_val, val);
 	log_dbg("flux2: appending %08x (pos %04x)", fluxval, stream_pos);
 
-	append_stream(track, fluxval, stream_pos);
+	flux_buffer_pos = append_stream(track, fluxval, flux_buffer_pos);
 
-	return 1;
+	return flux_buffer_pos;
 }
 
-int parse_flux3(FILE *f, struct track *track, bool ovl16, uint32_t stream_pos)
+int parse_flux3(struct track *track, bool ovl16, uint32_t stream_pos, uint32_t flux_buffer_pos)
 {
-	uint8_t val1, val2;
-	int rc;
+	uint8_t val1 = track->isb[stream_pos];
+	uint8_t val2 = track->isb[stream_pos+1];
 
-	rc = fread(&val1, 1, 1, f);
-	if (rc < 1) {
-		log_err("fread() fail");
-		exit(1);
-	}
-	rc = fread(&val2, 1, 1, f);
-	if (rc < 1) {
-		log_err("fread() fail");
-		exit(1);
-	}
 	flux_t fluxval = (val1 << 8) + val2;
 	if (ovl16) {
 		fluxval = 0x10000 + fluxval;
 	}
 
-	append_stream(track, fluxval, stream_pos);
+	flux_buffer_pos = append_stream(track, fluxval, flux_buffer_pos);
 
-	return 1;
+	return flux_buffer_pos;
 }
 
 
-int parse_flux_stream(char *fn, struct track *track, uint8_t side, uint8_t track_num)
-{
-	FILE *input;
-	uint32_t stream_pos = 0;
-
-	input = fopen(fn, "r");
-	if (input == NULL) {
-		return 1;
-	}
-
-	// values borrowed from http://www.softpres.org/kryoflux:stream
-	track->master_clock = ((18432000 * 73) / 14.0) / 2.0;
-	track->sample_clock = track->master_clock / 2;
-	track->index_clock  = track->master_clock / 16;
-
-	track->side  = side;
-	track->track = track_num;
-
-	track->indices_idx = 0;
-	track->indices_max = 1;
-	track->index = (struct index *)malloc(sizeof(struct index)*track->indices_max);
-
-	track->stream_buf_idx = 0;
-	track->stream_buf_max = 1;
-	track->stream_buf = NULL;
-
-	LIST_INIT(&(track->sectors));
-
-	log_dbg("CLOCKS: %.10f %.10f %.10f",
-		track->master_clock, track->sample_clock, track->index_clock);
-
-
-	uint8_t encoding_marker;
-	int rc;
-	bool eod = false;
-	bool ovl16 = false;
-
-	while (!eod) {
-		rc = fread(&encoding_marker, 1, 1, input);
-		if (rc < 1) {
-			break;
-		}
-
-		// http://www.softpres.org/kryoflux:stream
-		switch (encoding_marker) {
-		case 0x00:
-		case 0x01:
-		case 0x02:
-		case 0x03:
-		case 0x04:
-		case 0x05:
-		case 0x06:
-		case 0x07: {
-			log_dbg("SECTION [%02x] flux2", encoding_marker);
-			parse_flux2(input, track, encoding_marker, ovl16, stream_pos);
-			ovl16 = false; // if this was set, clear it.
-			stream_pos += 2;
-			break;
-		}
-		// one-byte no-op
-		case 0x08: {
-			log_dbg("SECTION [%02x] no-op 1", encoding_marker);
-			stream_pos += 1;
-			// no-op
-			break;
-		}
-		// two-byte no-op
-		case 0x09: {
-			log_dbg("SECTION [%02x] no-op 2", encoding_marker);
-			rc = fseek(input, 1, SEEK_CUR);
-			if (rc != 0) {
-				log_err("fseek() failed at pos %u: \"%s\"", stream_pos, strerror(errno));
-				exit(1);
-			}
-			stream_pos += 2;
-			break;
-		}
-		// three-byte no-op; seek forward two additional bytes
-		case 0x0a: {
-			log_dbg("SECTION [%02x] no-op 3", encoding_marker);
-			rc = fseek(input, 2, SEEK_CUR);
-			if (rc != 0) {
-				log_err("fseek() failed at pos %u: \"%s\"", stream_pos, strerror(errno));
-				exit(1);
-			}
-			stream_pos += 3;
-			break;
-		}
-		case 0x0b: {
-			log_dbg("SECTION [%02x] Overflow16, next flux block should be += 0x10000?", encoding_marker);
-			log_err("ALERT: next flux block should be += 0x10000");
-			stream_pos += 1;
-			break;
-		}
-		case 0x0c: {
-			log_dbg("SECTION [%02x] flux3", encoding_marker);
-			parse_flux3(input, track, ovl16, stream_pos);
-			ovl16 = false; // if this was set, clear it.
-			stream_pos += 3;
-			break;
-		}
-		case 0x0d: {
-			rc = parse_oob(input, track, &stream_pos);
-			if (rc == 1) {
-				eod = true;
-			}
-			else if (rc >= 2) {
-				log_err("Error parsing OOB block");
-				exit(1);
-			}
-			break;
-		}
-		default: {
-			if (encoding_marker >= 0x0e) {
-				if (ovl16) {
-					append_stream(track, 0x10000 + encoding_marker, stream_pos);
-					ovl16 = false;
-				}
-				else {
-					append_stream(track, encoding_marker, stream_pos);
-				}
-			}
-			else {
-				log_err("Error: Unknown block type %x", encoding_marker);
-			}
-			stream_pos += 1;
-		}
-		}
-	}
-
-	fclose(input);
-
-	return 0;
-}
 
 void dump_stream(struct track *track)
 {
 	uint32_t i;
-	for (i = 0; i < track->stream_buf_idx; i++) {
-		log_dbg("FLUX:  stream_pos:%8x flux_val:%8x", i, track->stream_buf[i]);
+	for (i = 0; i < track->flux_buf_idx; i++) {
+		log_dbg("FLUX:  stream_pos:%8x flux_val:%8x", i, track->flux_buffer[i].val);
 	}
 	for (i = 0; i < track->indices_idx; i++) {
 		log_dbg("INDEX: stream_pos:%8x sample_count:%8x index_counter:%8x",
@@ -260,20 +111,20 @@ int decode_pass(struct track *track, uint32_t index, uint32_t next_index, uint32
 {
 	uint32_t flux_count = 0;
 
-	if (index >= track->stream_buf_idx) {
+	if (index >= track->flux_buf_idx) {
 		log_err("[S:%x, T:%02u, PASS:%u] WARNING: SEEK ERROR ON STREAM_POS %x", track->side, track->track, pass, index);
 		return index;
 	}
 
 	// parse whole track
 	int error_count = 0;
-	while (index < next_index && index < track->stream_buf_idx) {
-		double flux_us = track->stream_buf[index] / track->sample_clock;
+	while (index < next_index && index < track->flux_buf_idx) {
+		double flux_us = track->flux_buffer[index].val / track->sample_clock;
 		if (test_flux_timing(flux_us)) {
 			error_count++;
 		}
 
-		*flux_sum += track->stream_buf[index];
+		*flux_sum += track->flux_buffer[index].val;
 		flux_count++;
 		index++;
 
@@ -314,9 +165,9 @@ int decode_flux(struct track *track)
 			track->side, track->track, pass,
 			track->index[pass].stream_pos,
 			track->index[pass].sample_counter / track->sample_clock * 1000 * 1000,
-			track->stream_buf[track->index[pass].stream_pos-1] / track->sample_clock * 1000 * 1000,
-			track->stream_buf[track->index[pass].stream_pos]  / track->sample_clock * 1000 * 1000,
-			track->stream_buf[track->index[pass].stream_pos+1]  / track->sample_clock * 1000 * 1000,
+			track->flux_buffer[track->index[pass].stream_pos-1].val / track->sample_clock * 1000 * 1000,
+			track->flux_buffer[track->index[pass].stream_pos].val  / track->sample_clock * 1000 * 1000,
+			track->flux_buffer[track->index[pass].stream_pos+1].val  / track->sample_clock * 1000 * 1000,
 			track->index[pass].index_counter);
 	}
 
@@ -362,12 +213,99 @@ int decode_flux(struct track *track)
 	return 0;
 }
 
+
+//int parse_flux_stream(&disk->side[side].t[track], uint8_t side, uint8_t track)
+//int parse_flux_stream(struct track *track, uint8_t side, uint8_t track_num)
+//{
+//	//int i = 0;
+//	bool ovl16 = false;
+//	int stream_pos = 0;
+//	int flux_buffer_pos = 0;
+//	while (stream_pos < track->isb_idx) {
+//
+//		// http://www.softpres.org/kryoflux:stream
+//		uint8_t encoding_marker = track->isb[stream_pos];
+//		switch (encoding_marker) {
+//		case 0x00:
+//		case 0x01:
+//		case 0x02:
+//		case 0x03:
+//		case 0x04:
+//		case 0x05:
+//		case 0x06:
+//		case 0x07: {
+//			log_dbg("SECTION [%02x] flux2", encoding_marker);
+//			flux_buffer_pos = parse_flux2(track, encoding_marker, ovl16, stream_pos, flux_buffer_pos);
+//			ovl16 = false;
+//			stream_pos += 2;
+//			break;
+//		}
+//		// one-byte no-op
+//		case 0x08: {
+//			log_dbg("SECTION [%02x] no-op 1", encoding_marker);
+//			stream_pos += 1;
+//			break;
+//		}
+//		// two-byte no-op
+//		case 0x09: {
+//			log_dbg("SECTION [%02x] no-op 2", encoding_marker);
+//			stream_pos += 2;
+//			break;
+//		}
+//		// three-byte no-op; seek forward two additional bytes
+//		case 0x0a: {
+//			log_dbg("SECTION [%02x] no-op 3", encoding_marker);
+//			stream_pos += 3;
+//			break;
+//		}
+//		// ovl16 ("overflow")
+//		case 0x0b: {
+//			log_dbg("SECTION [%02x] Overflow16, next flux block should be += 0x10000?", encoding_marker);
+//			ovl16 = true;
+//			stream_pos += 1;
+//			break;
+//		}
+//		// flux3
+//		case 0x0c: {
+//			log_dbg("SECTION [%02x] flux3", encoding_marker);
+//			flux_buffer_pos = parse_flux3(track, ovl16, stream_pos, flux_buffer_pos);
+//			ovl16 = false;
+//
+//			stream_pos += 3;
+//			break;
+//		}
+//		case 0x0d: {
+//			log_err("OOB found in ISB stream");
+//		}
+//		default: {
+//			if (encoding_marker >= 0x0e) {
+//				if (ovl16) {
+//					flux_buffer_pos = append_stream(track, 0x10000 + encoding_marker, flux_buffer_pos);
+//					ovl16 = false;
+//				}
+//				else {
+//					flux_buffer_pos = append_stream(track, encoding_marker, flux_buffer_pos);
+//				}
+//			}
+//			else {
+//				log_err("Error: Unknown block type %x", encoding_marker);
+//			}
+//			stream_pos += 1;
+//		}
+//		}
+//	}
+//
+//	return 0;
+//
+//}
+
+
 void free_stream(struct track *track)
 {
-	free(track->stream_buf);
-	track->stream_buf = NULL;
-	track->stream_buf_idx = 0;
-	track->stream_buf_max = 1;
+	free(track->flux_buffer);
+	track->flux_buffer = NULL;
+	track->flux_buf_idx = 0;
+	track->flux_buf_max = 1;
 
 	bytestream_destroy(&(track->stream));
 	free(track->stats.error_rate);
