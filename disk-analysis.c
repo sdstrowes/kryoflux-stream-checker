@@ -14,7 +14,6 @@
 
 #include <sys/queue.h>
 
-#define TRACK_MAX 84
 #define SIDES      2
 
 void print_help(char *binary_name)
@@ -185,6 +184,42 @@ void parse_atari_mfm_from_flux(struct disk_streams *disk, struct disk *disk_data
 	}
 }
 
+void consolidate_sectors(struct disk_streams *disk_streams, struct disk *disk_data)
+{
+	int s, t;
+	for (s = 0; s < SIDES; s++) {
+		for (t = 0; t < TRACK_MAX; t++) {
+			struct track *track = &disk_streams->side[s].t[t];
+			struct sector *sector;
+			LIST_FOREACH(sector, &track->sectors, next) {
+				if (sector->meta.calc_crc != sector->meta.disk_crc)
+					continue;
+				if (sector->data.calc_crc != sector->data.disk_crc)
+					continue;
+
+				int sec_idx = sector->meta.sector_num - 1;
+				int trk_idx = sector->meta.track;
+				int sid_idx = sector->meta.side;
+
+				if (sid_idx < 0 || sid_idx >= SIDES)
+					continue;
+				if (trk_idx < 0 || trk_idx >= TRACK_MAX)
+					continue;
+				if (sec_idx < 0 || sec_idx >= MAX_SECTORS)
+					continue;
+
+				struct sector *dst = &disk_data->side[sid_idx].track[trk_idx].sector[sec_idx];
+				if (dst->data.data != NULL)
+					continue;
+
+				dst->meta = sector->meta;
+				dst->data = sector->data;
+				sector->data.data = NULL;
+			}
+		}
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	char c;
@@ -217,6 +252,7 @@ int main(int argc, char *argv[])
 	log_init("", log_level);
 
 	struct disk disk_data;
+	memset(&disk_data, 0, sizeof(disk_data));
 
 	struct disk_streams disk;
 	init_struct_disk(&disk, fn_prefix);
@@ -226,6 +262,8 @@ int main(int argc, char *argv[])
 	//parse_buffers_from_files(&disk);
 
 	parse_atari_mfm_from_flux(&disk, &disk_data);
+
+	consolidate_sectors(&disk, &disk_data);
 
 	free_struct_disk(&disk);
 

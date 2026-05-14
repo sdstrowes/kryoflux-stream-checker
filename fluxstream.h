@@ -81,8 +81,10 @@ struct sector_array {
 	//struct sector_pass sector[10];
 };
 
+#define TRACK_MAX 84
+
 struct track_array {
-	struct sector_array track[81];
+	struct sector_array track[TRACK_MAX];
 };
 
 
