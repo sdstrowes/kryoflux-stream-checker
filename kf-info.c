@@ -39,8 +39,7 @@ int parse_kf_info(FILE *f, uint16_t size, struct kf_info *info)
 	char *delim = ",";
 	char *subdelim = "=";
 
-	int j;
-	for (j = 1, str1 = str; ; j++, str1 = NULL) {
+	for (str1 = str; ; str1 = NULL) {
 		token = strtok_r(str1, delim, &saveptr1);
 		if (token == NULL) {
 			break;

@@ -53,7 +53,7 @@ static log_func _log_func = printf_log_func;
 //}
 void log_init(const char *id, int debug)
 {
-	id = id;
+	(void)id;
 	_log_func = printf_log_func;
 	msg_threshold = debug;
 }

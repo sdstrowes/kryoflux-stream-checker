@@ -60,6 +60,7 @@ void init_struct_disk(struct disk_streams *disk, char *name_prefix)
 
 void free_struct_disk(struct disk_streams *disk)
 {
+	(void)disk;
 	int side;
 	for (side = 0; side < SIDES; side++) {
 //		while (!STAILQ_EMPTY(&disk->side[side])) {

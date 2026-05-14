@@ -1,4 +1,4 @@
-#ifndef __KF_OOH_H_
+#ifndef __KF_OOB_H_
 #define __KF_OOB_H_
 
 #include "fluxstream.h"

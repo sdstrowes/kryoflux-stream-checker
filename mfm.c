@@ -35,7 +35,7 @@ void bytestream_destroy(struct bytestream **s)
 void print_d_c_vals(uint8_t val, uint8_t side, uint8_t track, uint32_t idx)
 {
 	// FIXME
-	side = side; track = track; idx = idx;
+	(void)side; (void)track; (void)idx;
 
 	uint8_t part1 = 0;
 	uint8_t part2 = 0;
@@ -102,6 +102,7 @@ struct sync_mark pre_mark = { { 0x44, 0x89, 0x44, 0x89, 0x44, 0x89 } };
 
 uint8_t test_sync_patterns(struct bytestream *stream, int location, bool debug)
 {
+	(void)debug;
 	int rc;
 	uint8_t data[6];
 
@@ -140,6 +141,7 @@ void print_hex(char *buffer, uint8_t *val, int n)
 
 void bytestream_push(struct bytestream *stream, uint8_t val, int bits, uint8_t track_num, uint8_t side_num, uint32_t idx, double time_index)
 {
+	(void)track_num; (void)side_num; (void)idx; (void)time_index;
 
 	uint32_t index = stream->ptr / 8;
 	uint32_t subidx = stream->ptr % 8;
@@ -381,6 +383,7 @@ uint16_t calc_crc(uint8_t d, uint16_t crc_val)
 
 int parse_data(struct disk *disk, struct sector *sector, struct bytestream *stream, int location, int length_bytes)
 {
+	(void)disk;
 	int rc = 0;
 
 	uint8_t data[2];
@@ -810,7 +813,7 @@ int mfm_decode_passes(struct track *track, uint32_t index, uint32_t next_index)
 
 	double time_index = 0.0;
 
-	int debug_limit = index + 16;
+	uint32_t debug_limit = index + 16;
 
 	while (index < next_index && index < track->flux_buf_idx) {
 		double flux_us = track->flux_buffer[index].val / track->sample_clock;
@@ -905,8 +908,6 @@ int decode_flux_to_mfm(struct disk *disk, struct track *track)
 
 		uint32_t index_counter_delta = track->index[i+1].index_counter - track->index[i].index_counter;
 		log_dbg("idx counter delta: %u, clock: %f", index_counter_delta, index_counter_delta / track->index_clock);
-
-		uint32_t pass = track->indices_idx - 1;
 
 		uint32_t first_index = track->index[i].stream_pos;
 		uint32_t last_index  = track->index[i+1].stream_pos;
