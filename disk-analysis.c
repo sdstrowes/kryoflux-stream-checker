@@ -25,6 +25,7 @@ void print_help(char *binary_name)
 	printf("Optional:\n");
 	printf(" -d: enable debug\n");
 	printf(" -h: this help\n");
+	printf(" -o <dir>: extract files to directory\n");
 }
 
 //struct track_data {
@@ -221,17 +222,34 @@ void consolidate_sectors(struct disk_streams *disk_streams, struct disk *disk_da
 	}
 }
 
+static int count_decoded_sectors(struct disk *disk_data)
+{
+	int count = 0;
+	int s, t, sec;
+	for (s = 0; s < 2; s++)
+		for (t = 0; t < TRACK_MAX; t++)
+			for (sec = 0; sec < MAX_SECTORS; sec++)
+				if (disk_data->side[s].track[t].sector[sec].data.data != NULL)
+					count++;
+	return count;
+}
+
 int main(int argc, char *argv[])
 {
 	char c;
 	char *fn_prefix = NULL;
+	char *out_dir   = NULL;
 	int log_level = LOG_INFO;
 
 	opterr = 0;	// silence error output on bad options
-	while ((c = getopt (argc, argv, "dhn:")) != -1) {
+	while ((c = getopt(argc, argv, "dhn:o:")) != -1) {
 		switch (c) {
 		case 'n': {
 			fn_prefix = optarg;
+			break;
+		}
+		case 'o': {
+			out_dir = optarg;
 			break;
 		}
 		case 'd': {
@@ -268,7 +286,13 @@ int main(int argc, char *argv[])
 
 	struct bpb bpb;
 	if (parse_boot_sector(&disk_data, &bpb) != 0) {
-		log_err("Failed to parse boot sector");
+		int decoded = count_decoded_sectors(&disk_data);
+		if (decoded > 0)
+			printf("Disk has %d readable MFM sectors but no valid boot sector.\n"
+			       "This may be a copy-protected disk; no filesystem data to display.\n",
+			       decoded);
+		else
+			printf("No readable sectors found on disk.\n");
 		return 1;
 	}
 	print_bpb(&bpb);
@@ -280,6 +304,12 @@ int main(int argc, char *argv[])
 	}
 	print_fat_summary(&fat);
 	print_directory_tree(&disk_data, &bpb, &fat);
+
+	if (out_dir != NULL) {
+		if (extract_files(&disk_data, &bpb, &fat, out_dir) == 0)
+			printf("Extracted to: %s\n", out_dir);
+	}
+
 	free_fat(&fat);
 
 	free_struct_disk(&disk);

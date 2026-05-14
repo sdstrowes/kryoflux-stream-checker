@@ -1,7 +1,10 @@
+#include <errno.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "atari-fs.h"
 #include "disk-analysis-log.h"
@@ -377,6 +380,109 @@ void print_directory_tree(struct disk *disk_data, struct bpb *bpb, struct fat *f
 	}
 	list_dir(disk_data, bpb, fat, buf, size, 1);
 	free(buf);
+}
+
+static int extract_file(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
+                         uint16_t first_cluster, uint32_t file_size,
+                         const char *out_path)
+{
+	FILE *f = fopen(out_path, "wb");
+	if (!f) {
+		log_err("Cannot create %s: %s", out_path, strerror(errno));
+		return -1;
+	}
+
+	uint32_t remaining = file_size;
+	uint16_t cluster = first_cluster;
+	static const uint8_t zeros[512];
+
+	while (remaining > 0 && cluster >= 2 && !fat_is_end_of_chain(cluster)) {
+		uint16_t lsn = fat_cluster_to_lsn(bpb, cluster);
+		for (uint8_t s = 0; s < bpb->sectors_per_cluster && remaining > 0; s++) {
+			uint32_t to_write = remaining < bpb->bytes_per_sector
+			                    ? remaining : bpb->bytes_per_sector;
+			struct sector *sec = get_logical_sector(disk_data, bpb, lsn + s);
+			if (sec)
+				fwrite(sec->data.data, 1, to_write, f);
+			else {
+				log_err("Missing sector at LSN %u, writing zeros", lsn + s);
+				fwrite(zeros, 1, to_write, f);
+			}
+			remaining -= to_write;
+		}
+		cluster = fat_next_cluster(fat, cluster);
+	}
+
+	fclose(f);
+	return 0;
+}
+
+static void extract_dir(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
+                         uint8_t *buf, uint32_t size, const char *out_path)
+{
+	uint32_t num_entries = size / DIRENT_SIZE;
+	for (uint32_t i = 0; i < num_entries; i++) {
+		uint8_t *e = buf + i * DIRENT_SIZE;
+
+		if (e[0] == 0x00)
+			break;
+		if (e[0] == 0xE5)
+			continue;
+
+		uint8_t attr = e[11];
+		if (attr & ATTR_VOLUME)
+			continue;
+
+		char name[13];
+		format_83_name(e, name);
+
+		if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+			continue;
+
+		char entry_path[PATH_MAX];
+		snprintf(entry_path, sizeof(entry_path), "%s/%s", out_path, name);
+
+		uint16_t first_cluster = (uint16_t)e[26] | ((uint16_t)e[27] << 8);
+		uint32_t file_size     = (uint32_t)e[28] | ((uint32_t)e[29] << 8) |
+		                         ((uint32_t)e[30] << 16) | ((uint32_t)e[31] << 24);
+
+		if (attr & ATTR_SUBDIR) {
+			if (mkdir(entry_path, 0755) != 0 && errno != EEXIST) {
+				log_err("Cannot create directory %s: %s", entry_path, strerror(errno));
+				continue;
+			}
+			if (first_cluster >= 2) {
+				uint32_t sub_size;
+				uint8_t *sub_buf = read_dir_data(disk_data, bpb, fat,
+				                                 first_cluster, 0, &sub_size);
+				if (sub_buf) {
+					extract_dir(disk_data, bpb, fat, sub_buf, sub_size, entry_path);
+					free(sub_buf);
+				}
+			}
+		} else {
+			extract_file(disk_data, bpb, fat, first_cluster, file_size, entry_path);
+		}
+	}
+}
+
+int extract_files(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
+                   const char *out_dir)
+{
+	if (mkdir(out_dir, 0755) != 0 && errno != EEXIST) {
+		log_err("Cannot create output directory %s: %s", out_dir, strerror(errno));
+		return -1;
+	}
+
+	uint32_t size;
+	uint8_t *buf = read_dir_data(disk_data, bpb, fat, 0, 1, &size);
+	if (!buf) {
+		log_err("Failed to read root directory for extraction");
+		return -1;
+	}
+	extract_dir(disk_data, bpb, fat, buf, size, out_dir);
+	free(buf);
+	return 0;
 }
 
 void print_bpb(struct bpb *bpb)
