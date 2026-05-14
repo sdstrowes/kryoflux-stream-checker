@@ -97,7 +97,7 @@ void dump_bytes(struct bytestream *stream, int location, int length)
 
 
 struct sync_mark { uint8_t bytes[6]; };
-// This is 3x 0x41 on the data plane
+// This is 3x 0xA1 on the data plane
 struct sync_mark pre_mark = { { 0x44, 0x89, 0x44, 0x89, 0x44, 0x89 } };
 
 uint8_t test_sync_patterns(struct bytestream *stream, int location, bool debug)
@@ -183,11 +183,11 @@ void separate_data_clock(uint8_t *data, uint8_t *d, uint8_t *c)
 		 (data[1] & 0x01);
 
 	*c    =  (data[0] & 0x80)       |
-		((data[0] & 0x40) << 1) |
+		((data[0] & 0x20) << 1) |
 		((data[0] & 0x08) << 2) |
 		((data[0] & 0x02) << 3) |
 		((data[1] & 0x80) >> 4) |
-		((data[1] & 0x40) >> 3) |
+		((data[1] & 0x20) >> 3) |
 		((data[1] & 0x08) >> 2) |
 		((data[1] & 0x02) >> 1);
 }
@@ -260,7 +260,7 @@ int parse_id_record(struct sector *sector, struct bytestream *stream, int locati
 	crc = (crc << 8) ^ t ^ (t << 5) ^ (t << 12);
 
 	separate_data_clock(data+8, &d, &c);
-	if (d > 4) {
+	if (d >= 4) {
 		log_err("Invalid sector size in sector header: %02x", d);
 		return -1;
 	}
@@ -401,7 +401,7 @@ int parse_data(struct disk *disk, struct sector *sector, struct bytestream *stre
 		log_err("Data byte leading into data sector should be 0xfb, but is %02x", d);
 	}
 
-	uint8_t *data_bytes = (uint8_t *)calloc(1, 512);
+	uint8_t *data_bytes = (uint8_t *)calloc(1, length_bytes);
 
 
 	while (rc < length_bytes) {
@@ -428,7 +428,7 @@ int parse_data(struct disk *disk, struct sector *sector, struct bytestream *stre
 	}
 
 	int i;
-	for (i = 0; i < 512; i++) {
+	for (i = 0; i < length_bytes; i++) {
 		if (!(i % 8)) {
 			printf("\nDATA2 %02x/%02x/%02x %03x:",
 			sector->meta.side,
@@ -440,7 +440,8 @@ int parse_data(struct disk *disk, struct sector *sector, struct bytestream *stre
 	}
 	printf("\n");
 
-	//disk->side[sector->meta.side].track[sector->meta.track].sector[sector->meta.sector_num].data.data = data_bytes;
+	sector->data.data     = data_bytes;
+	sector->data.data_len = length_bytes;
 
 	printf("DATA:");
 	//int i;
@@ -676,7 +677,6 @@ void parse_data_stream(struct disk *disk, struct track *track)
 			uint8_t code = test_sync_patterns(stream, i, true);
 			switch (code) {
 			case MARKER_PRE: {
-				parser_state = FOUND_ID;
 				i += PRE_MARK_LEN_BITS;
 				parser_state = FOUND_DATA;
 				break;
@@ -813,14 +813,8 @@ int mfm_decode_passes(struct track *track, uint32_t index, uint32_t next_index)
 
 	double time_index = 0.0;
 
-	uint32_t debug_limit = index + 16;
-
 	while (index < next_index && index < track->flux_buf_idx) {
 		double flux_us = track->flux_buffer[index].val / track->sample_clock;
-
-		if (index < debug_limit) {
-			printf("doing something!\n");
-		}
 
 		time_index += flux_us;
 		index++;

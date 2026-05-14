@@ -15,9 +15,8 @@ void sector_init(struct sector **s)
 	sector->pass_count    = 0;
 	memset(&sector->meta, 0, sizeof(struct sector_meta));
 	memset(&sector->data, 0, sizeof(struct sector_pass));
-	sector->data.data     = (uint8_t *)malloc(512);
-	memset(sector->data.data, 0, 512);
-	sector->data.data_len = 512;
+	sector->data.data     = NULL;
+	sector->data.data_len = 0;
 
 	*s = sector;
 }
