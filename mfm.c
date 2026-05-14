@@ -652,21 +652,25 @@ void parse_data_stream(struct disk *disk, struct track *track)
 			log_dbg("[parsed zero gap: %u 0x00's]", rc);
 			i += rc * 8 * 2;
 
-			uint8_t code = test_sync_patterns(stream, i, true);
-			switch (code) {
-			case MARKER_PRE: {
-				i += PRE_MARK_LEN_BITS;
-				parser_state = FOUND_DATA;
-				break;
+			/* Scan a small window for the pre-mark; flux timing jitter can
+			 * leave i a few bits short of the actual mark position. */
+			uint32_t scan_end = i + 64;
+			if (scan_end > stream->ptr) scan_end = stream->ptr;
+			uint32_t scan;
+			for (scan = i; scan < scan_end; scan++) {
+				if (test_sync_patterns(stream, scan, false) == MARKER_PRE) {
+					i = scan + PRE_MARK_LEN_BITS;
+					parser_state = FOUND_DATA;
+					break;
+				}
 			}
-			default: {
+			if (parser_state != FOUND_DATA) {
 				log_err("Unknown sync pattern! [%s]", log_line);
 				parser_state = SEEKING_PRE_ID;
 
 				free(sector->data.data);
 				free(sector);
 				sector = NULL;
-			}
 			}
 
 			break;
@@ -886,10 +890,9 @@ int decode_flux_to_mfm(struct disk *disk, struct track *track)
 
 		log_dbg("MFM [S:%x, T:%02u] Gonna decode flux stream: %x -- %x", track->side, track->track, first_index, last_index);
 		mfm_decode_passes(track, first_index, last_index);
+		log_dbg("MFM [S:%x, T:%02u] Gonna parse the data out", track->side, track->track);
+		parse_data_stream(disk, track);
 	}
-
-	log_dbg("MFM [S:%x, T:%02u] Gonna parse the data out", track->side, track->track);
-	parse_data_stream(disk, track);
 
 	return 0;
 }

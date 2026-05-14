@@ -105,10 +105,14 @@ int read_fat(struct disk *disk_data, struct bpb *bpb, struct fat *out)
 
 	for (uint16_t i = 0; i < bpb->sectors_per_fat; i++) {
 		struct sector *s = get_logical_sector(disk_data, bpb, bpb->fat1_sector + i);
+		if (s == NULL && bpb->num_fats >= 2) {
+			log_msg("FAT1: sector %u missing, trying FAT2", bpb->fat1_sector + i);
+			s = get_logical_sector(disk_data, bpb, bpb->fat2_sector + i);
+		}
 		if (s == NULL) {
-			log_err("FAT: sector %u missing", bpb->fat1_sector + i);
-			free(buf);
-			return -1;
+			log_err("FAT: sector %u missing in all copies, using zeros", bpb->fat1_sector + i);
+			memset(buf + i * bpb->bytes_per_sector, 0, bpb->bytes_per_sector);
+			continue;
 		}
 		memcpy(buf + i * bpb->bytes_per_sector, s->data.data, bpb->bytes_per_sector);
 	}
