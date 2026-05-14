@@ -273,6 +273,14 @@ int main(int argc, char *argv[])
 	}
 	print_bpb(&bpb);
 
+	struct fat fat;
+	if (read_fat(&disk_data, &bpb, &fat) != 0) {
+		log_err("Failed to read FAT");
+		return 1;
+	}
+	print_fat_summary(&fat);
+	free_fat(&fat);
+
 	free_struct_disk(&disk);
 
 

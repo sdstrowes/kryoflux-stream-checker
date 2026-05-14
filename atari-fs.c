@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "atari-fs.h"
@@ -92,6 +93,93 @@ struct sector *get_logical_sector(struct disk *disk_data, struct bpb *bpb, uint1
 		return NULL;
 
 	return s;
+}
+
+int read_fat(struct disk *disk_data, struct bpb *bpb, struct fat *out)
+{
+	uint32_t fat_bytes = (uint32_t)bpb->sectors_per_fat * bpb->bytes_per_sector;
+
+	uint8_t *buf = calloc(fat_bytes, 1);
+	if (buf == NULL)
+		return -1;
+
+	for (uint16_t i = 0; i < bpb->sectors_per_fat; i++) {
+		struct sector *s = get_logical_sector(disk_data, bpb, bpb->fat1_sector + i);
+		if (s == NULL) {
+			log_err("FAT: sector %u missing", bpb->fat1_sector + i);
+			free(buf);
+			return -1;
+		}
+		memcpy(buf + i * bpb->bytes_per_sector, s->data.data, bpb->bytes_per_sector);
+	}
+
+	/* FAT12: each entry is 12 bits, so 2 entries per 3 bytes */
+	uint16_t num_entries = (uint16_t)((fat_bytes * 2) / 3);
+
+	uint16_t *entries = calloc(num_entries, sizeof(uint16_t));
+	if (entries == NULL) {
+		free(buf);
+		return -1;
+	}
+
+	for (uint16_t n = 0; n < num_entries; n++) {
+		uint32_t byte_off = ((uint32_t)n * 3) / 2;
+		if (n % 2 == 0)
+			entries[n] = buf[byte_off] | ((uint16_t)(buf[byte_off + 1] & 0x0F) << 8);
+		else
+			entries[n] = (buf[byte_off] >> 4) | ((uint16_t)buf[byte_off + 1] << 4);
+	}
+
+	free(buf);
+	out->entries     = entries;
+	out->num_entries = num_entries;
+	return 0;
+}
+
+void free_fat(struct fat *fat)
+{
+	free(fat->entries);
+	fat->entries     = NULL;
+	fat->num_entries = 0;
+}
+
+uint16_t fat_next_cluster(struct fat *fat, uint16_t cluster)
+{
+	if (cluster >= fat->num_entries)
+		return 0xFFF;
+	return fat->entries[cluster];
+}
+
+int fat_is_end_of_chain(uint16_t cluster)
+{
+	return cluster >= 0xFF8;
+}
+
+uint16_t fat_cluster_to_lsn(struct bpb *bpb, uint16_t cluster)
+{
+	return bpb->data_sector + (cluster - 2) * bpb->sectors_per_cluster;
+}
+
+void print_fat_summary(struct fat *fat)
+{
+	uint16_t free_count = 0, used_count = 0, bad_count = 0;
+
+	/* entries 0 and 1 are reserved; data clusters start at 2 */
+	for (uint16_t n = 2; n < fat->num_entries; n++) {
+		uint16_t v = fat->entries[n];
+		if (v == 0x000)
+			free_count++;
+		else if (v == 0xFF7)
+			bad_count++;
+		else
+			used_count++;
+	}
+
+	printf("FAT:\n");
+	printf("  entry[0] (media):  0x%03x\n", fat->entries[0]);
+	printf("  entry[1] (eoc):    0x%03x\n", fat->entries[1]);
+	printf("  data clusters:     %u total, %u used, %u free, %u bad\n",
+	       fat->num_entries - 2, used_count, free_count, bad_count);
 }
 
 void print_bpb(struct bpb *bpb)

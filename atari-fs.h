@@ -5,6 +5,11 @@
 
 #include "fluxstream.h"
 
+struct fat {
+	uint16_t *entries;
+	uint16_t  num_entries;
+};
+
 struct bpb {
 	uint8_t  oem[8];              /* 0x03, 8 bytes, often not meaningful */
 	uint16_t bytes_per_sector;    /* 0x0B */
@@ -30,5 +35,12 @@ struct bpb {
 int            parse_boot_sector(struct disk *disk_data, struct bpb *out);
 void           print_bpb(struct bpb *bpb);
 struct sector *get_logical_sector(struct disk *disk_data, struct bpb *bpb, uint16_t lsn);
+
+int      read_fat(struct disk *disk_data, struct bpb *bpb, struct fat *out);
+void     free_fat(struct fat *fat);
+uint16_t fat_next_cluster(struct fat *fat, uint16_t cluster);
+int      fat_is_end_of_chain(uint16_t cluster);
+uint16_t fat_cluster_to_lsn(struct bpb *bpb, uint16_t cluster);
+void     print_fat_summary(struct fat *fat);
 
 #endif
