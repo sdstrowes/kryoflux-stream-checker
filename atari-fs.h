@@ -42,5 +42,6 @@ uint16_t fat_next_cluster(struct fat *fat, uint16_t cluster);
 int      fat_is_end_of_chain(uint16_t cluster);
 uint16_t fat_cluster_to_lsn(struct bpb *bpb, uint16_t cluster);
 void     print_fat_summary(struct fat *fat);
+void     print_directory_tree(struct disk *disk_data, struct bpb *bpb, struct fat *fat);
 
 #endif

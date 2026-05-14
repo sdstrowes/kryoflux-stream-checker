@@ -279,6 +279,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	print_fat_summary(&fat);
+	print_directory_tree(&disk_data, &bpb, &fat);
 	free_fat(&fat);
 
 	free_struct_disk(&disk);
