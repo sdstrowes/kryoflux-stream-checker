@@ -16,8 +16,8 @@ void bytestream_init(struct bytestream **s)
 {
 	struct bytestream *stream = (struct bytestream *)malloc(sizeof(struct bytestream));
 
-	memset(stream->stream,   STREAM_BUFFER_SIZE,   sizeof(stream->stream));
-	memset(stream->time_idx, STREAM_BUFFER_SIZE,   sizeof(stream->time_idx));
+	memset(stream->stream,   0, sizeof(stream->stream));
+	memset(stream->time_idx, 0, sizeof(stream->time_idx));
 //	memset(stream->recent,   STREAM_RECENT_WINDOW, sizeof(stream->recent));
 	stream->ptr = 0;
 //	stream->subptr = 0;
@@ -780,9 +780,9 @@ void count_flux_sum(struct track *track, uint32_t index, uint32_t next_index, ui
 	 * the previous index.
 	 */
 	while (index < next_index && index < track->flux_buf_idx) {
-		index++;
 		//double flux_us = track->stream_buf[index] / track->sample_clock;
 		*flux_sum += track->flux_buffer[index].val;
+		index++;
 	}
 
 	// Decoder must manually insert an empty flux at the end.

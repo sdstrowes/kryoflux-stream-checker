@@ -17,9 +17,6 @@
 #define TRACK_MAX 84
 #define SIDES      2
 
-#define TRACK_MAX 1
-#define SIDES      1
-
 void print_help(char *binary_name)
 {
 	printf("%s:\n", binary_name);
@@ -89,7 +86,6 @@ char *construct_filename(char *prefix, int side, int track)
 	int buffer_size = strlen(prefix) + 8 + 1;
 
 	char *fn = (char *)malloc(buffer_size);
-	memset(fn, '\0', buffer_size);
 	if (fn == NULL) {
 		log_err("malloc() failed; \"%s\"", strerror(errno));
 		exit(1);
