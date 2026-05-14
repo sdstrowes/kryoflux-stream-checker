@@ -61,24 +61,20 @@ void init_struct_disk(struct disk_streams *disk, char *name_prefix)
 
 void free_struct_disk(struct disk_streams *disk)
 {
-	(void)disk;
-	int side;
-	for (side = 0; side < SIDES; side++) {
-//		while (!STAILQ_EMPTY(&disk->side[side])) {
-//			struct track_data *track = STAILQ_FIRST(&disk->side[side]);
-//
-//			while (!LIST_EMPTY(&(track->t.sectors))) {
-//				struct sector *sector = LIST_FIRST(&(track->t.sectors));
-//				LIST_REMOVE(sector, next);
-//				free(sector->data.data);
-//				free(sector);
-//			}
-//
-//			free_stream(&(track->t));
-//
-//			STAILQ_REMOVE_HEAD(&disk->side[side], next);
-//			free(track);
-//		}
+	int s, t;
+	for (s = 0; s < SIDES; s++) {
+		for (t = 0; t < TRACK_MAX; t++) {
+			struct track *track = &disk->side[s].t[t];
+			while (!LIST_EMPTY(&track->sectors)) {
+				struct sector *sector = LIST_FIRST(&track->sectors);
+				LIST_REMOVE(sector, next);
+				free(sector->data.data);
+				free(sector);
+			}
+			free(track->isb);
+			track->isb = NULL;
+			free_stream(track);
+		}
 	}
 }
 

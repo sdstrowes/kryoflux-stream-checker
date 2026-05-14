@@ -293,7 +293,9 @@ static uint8_t *read_dir_data(struct disk *disk_data, struct bpb *bpb, struct fa
 
 		cluster = first_cluster;
 		uint32_t off = 0;
-		while (cluster >= 2 && !fat_is_end_of_chain(cluster)) {
+		uint32_t clusters_written = 0;
+		while (cluster >= 2 && !fat_is_end_of_chain(cluster) &&
+		       clusters_written < num_clusters) {
 			uint16_t lsn = fat_cluster_to_lsn(bpb, cluster);
 			for (uint8_t i = 0; i < bpb->sectors_per_cluster; i++) {
 				struct sector *s = get_logical_sector(disk_data, bpb, lsn + i);
@@ -302,6 +304,7 @@ static uint8_t *read_dir_data(struct disk *disk_data, struct bpb *bpb, struct fa
 				off += bpb->bytes_per_sector;
 			}
 			cluster = fat_next_cluster(fat, cluster);
+			clusters_written++;
 		}
 	}
 

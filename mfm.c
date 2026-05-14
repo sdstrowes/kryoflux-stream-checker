@@ -322,6 +322,7 @@ int parse_data(struct disk *disk, struct sector *sector, struct bytestream *stre
 
 	if (d != 0xfb) {
 		log_err("Data byte leading into data sector should be 0xfb, but is %02x", d);
+		return -1;
 	}
 
 	uint8_t *data_bytes = (uint8_t *)calloc(1, length_bytes);
@@ -547,6 +548,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 				log_err("sprintf() error?");
 				break;
 			}
+			sts_str_len = (LINE_MAX - 1) - rc;
 
 			char sts_str[80];
 			sts_str[0] = '\0';
@@ -588,6 +590,13 @@ void parse_data_stream(struct disk *disk, struct track *track)
 		case FOUND_DATA: {
 			log_dbg("parser_state [%u] found data", parser_state);
 			int rc = parse_data(disk, sector, stream, i, sector->meta.size);
+			if (rc < 0) {
+				free(sector->data.data);
+				free(sector);
+				sector = NULL;
+				parser_state = SEEKING_PRE_ID;
+				break;
+			}
 			log_dbg("[parsed data field; %u bytes", rc);
 			if (rc != sector->meta.size + 1 + 2) {
 				if (sector->data.disk_crc != sector->data.calc_crc) {

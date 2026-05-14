@@ -12,6 +12,10 @@
 void sector_init(struct sector **s)
 {
 	struct sector *sector = (struct sector *)malloc(sizeof(struct sector));
+	if (sector == NULL) {
+		log_err("malloc failed in sector_init");
+		exit(1);
+	}
 	sector->pass_count    = 0;
 	memset(&sector->meta, 0, sizeof(struct sector_meta));
 	memset(&sector->data, 0, sizeof(struct sector_pass));
@@ -29,6 +33,10 @@ uint32_t append_stream(struct track *track, flux_t flux_val, uint32_t flux_buffe
 		track->flux_buf_max *= 2;
 
 		struct flux_entry *tmp = (struct flux_entry *)calloc(track->flux_buf_max, sizeof(struct flux_entry));
+		if (tmp == NULL) {
+			log_err("calloc failed in append_stream");
+			exit(1);
+		}
 		if (track->flux_buffer != NULL) {
 			memcpy(tmp, track->flux_buffer, old_max*sizeof(struct flux_entry));
 			free(track->flux_buffer);
