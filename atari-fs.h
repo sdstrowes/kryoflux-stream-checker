@@ -27,7 +27,8 @@ struct bpb {
 	uint16_t data_sector;
 };
 
-int  parse_boot_sector(struct disk *disk_data, struct bpb *out);
-void print_bpb(struct bpb *bpb);
+int            parse_boot_sector(struct disk *disk_data, struct bpb *out);
+void           print_bpb(struct bpb *bpb);
+struct sector *get_logical_sector(struct disk *disk_data, struct bpb *bpb, uint16_t lsn);
 
 #endif

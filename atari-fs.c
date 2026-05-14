@@ -75,6 +75,25 @@ int parse_boot_sector(struct disk *disk_data, struct bpb *out)
 	return 0;
 }
 
+struct sector *get_logical_sector(struct disk *disk_data, struct bpb *bpb, uint16_t lsn)
+{
+	if (lsn >= bpb->total_sectors)
+		return NULL;
+
+	uint16_t track  = lsn / (bpb->sectors_per_track * bpb->num_sides);
+	uint16_t side   = (lsn / bpb->sectors_per_track) % bpb->num_sides;
+	uint16_t sector = lsn % bpb->sectors_per_track;
+
+	if (track >= TRACK_MAX || side >= 2 || sector >= MAX_SECTORS)
+		return NULL;
+
+	struct sector *s = &disk_data->side[side].track[track].sector[sector];
+	if (s->data.data == NULL)
+		return NULL;
+
+	return s;
+}
+
 void print_bpb(struct bpb *bpb)
 {
 	char oem_printable[9];
