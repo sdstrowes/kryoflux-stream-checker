@@ -292,83 +292,6 @@ int parse_id_record(struct sector *sector, struct bytestream *stream, int locati
 }
 
 
-/* Parses a sequence of zeroes */
-int parse_sync_mark(struct bytestream *stream, int location)
-{
-	int rc = 0;
-
-	uint8_t data[2];
-	uint8_t d, c;
-
-	bytestream_get_location(stream, location, data, 2);
-	separate_data_clock(data, &d, &c);
-
-	while (d == 0x00) {
-		rc++;
-		location += 16;
-
-		bytestream_get_location(stream, location, data, 2);
-		separate_data_clock(data, &d, &c);
-	}
-
-	if (rc != 12) {
-		log_dbg("This can legally be other values, but right now: I only parsed %u 0x00s", rc);
-	}
-
-	return rc;
-}
-
-/* parse a sequence of 0x4es */
-int parse_gap_3a(struct bytestream *stream, int location)
-{
-	int rc = 0;
-
-	uint8_t data[2];
-	uint8_t d, c;
-
-	bytestream_get_location(stream, location, data, 2);
-	separate_data_clock(data, &d, &c);
-
-	while (d == 0x4e) {
-		rc++;
-		location += 16;
-
-		bytestream_get_location(stream, location, data, 2);
-		separate_data_clock(data, &d, &c);
-	}
-
-	if (rc != 22) {
-		log_dbg("This can legally be other values, but right now: I only parsed %u 0x4es", rc);
-	}
-
-	return rc;
-}
-
-
-int parse_gap_4(struct bytestream *stream, int location)
-{
-	int rc = 0;
-
-	uint8_t data[2];
-	uint8_t d, c;
-
-	bytestream_get_location(stream, location, data, 2);
-	separate_data_clock(data, &d, &c);
-
-	while (d == 0x4e) {
-		rc++;
-		location += 16;
-
-		bytestream_get_location(stream, location, data, 2);
-		separate_data_clock(data, &d, &c);
-	}
-
-	if (rc != 40) {
-		log_dbg("This can legally be other values, but right now: I only parsed %u 0x4es", rc);
-	}
-
-	return rc;
-}
 
 uint16_t calc_crc(uint8_t d, uint16_t crc_val)
 {
@@ -614,7 +537,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 			}
 
 			i += ID_RECORD_LEN_BITS;
-			parser_state = SEEKING_POST_ID;
+			parser_state = SEEKING_DATA;
 			rc = sprintf(log_line, "[Phase 2: side:%02u, track:%02u, sector:%02u, size:%u]",
 					sector->meta.side,
 					sector->meta.track,
@@ -635,44 +558,30 @@ void parse_data_stream(struct disk *disk, struct track *track)
 			break;
 		}
 
-		case SEEKING_POST_ID: {
-			log_dbg("parser_state [%u] seeking post ID", parser_state);
-			int rc = parse_gap_3a(stream, i);
-			i += rc * 8 * 2;
-			log_dbg("[parsed ID record post-mark: %u 0x4e's]", rc);
-
-			parser_state = SEEKING_DATA;
-
-			break;
-		}
-
 		case SEEKING_DATA: {
 			log_dbg("parser_state [%u] seeking data", parser_state);
-			int rc = parse_sync_mark(stream, i);
-			log_dbg("[parsed zero gap: %u 0x00's]", rc);
-			i += rc * 8 * 2;
-
-			/* Scan a small window for the pre-mark; flux timing jitter can
-			 * leave i a few bits short of the actual mark position. */
-			uint32_t scan_end = i + 64;
+			/* Scan forward for the data sync mark. Cap at 1024 bits
+			 * (~gap 3a + sync zeros) so a missing data mark doesn't
+			 * overshoot into the next sector's ID mark. */
+			uint32_t scan_end = i + 1024;
 			if (scan_end > stream->ptr) scan_end = stream->ptr;
+			int found = 0;
 			uint32_t scan;
 			for (scan = i; scan < scan_end; scan++) {
 				if (test_sync_patterns(stream, scan, false) == MARKER_PRE) {
 					i = scan + PRE_MARK_LEN_BITS;
 					parser_state = FOUND_DATA;
+					found = 1;
 					break;
 				}
 			}
-			if (parser_state != FOUND_DATA) {
-				log_err("Unknown sync pattern! [%s]", log_line);
+			if (!found) {
+				log_err("Data sync mark not found [%s]", log_line);
 				parser_state = SEEKING_PRE_ID;
-
 				free(sector->data.data);
 				free(sector);
 				sector = NULL;
 			}
-
 			break;
 		}
 
@@ -711,27 +620,11 @@ void parse_data_stream(struct disk *disk, struct track *track)
 		}
 
 		case SEEKING_POST_DATA: {
-			log_dbg("parser_state [%u]  seeking post-data", parser_state);
-			int rc = parse_gap_4(stream, i);
-			log_dbg("[parsed %u 0x4e's]", rc);
-			if (rc != 40) {
-				log_dbg("This can legally be other values, but right now: I only parsed %u 0x4es", rc);
-			}
-			i += rc * 8 * 2;
-
-			rc = parse_sync_mark(stream, i);
-			log_dbg("[parsed zero gap: %u 0x00's]", rc);
-			i += rc * 8 * 2;
-
 			log_msg("%s", log_line);
-
-			/* store */
+			/* Store sector; SEEKING_PRE_ID will scan forward through gap 4. */
 			LIST_INSERT_HEAD(&track->sectors, sector, next);
-
-			/* reset */
 			sector = NULL;
 			parser_state = SEEKING_PRE_ID;
-
 			break;
 		}
 
