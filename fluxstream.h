@@ -43,6 +43,10 @@ struct sector_meta {
 
 	double start_ms;
 	double end_ms;
+
+	uint32_t id_bit_start;
+	uint32_t data_bit_start;
+	uint32_t data_bit_end;
 };
 
 struct sector_pass {

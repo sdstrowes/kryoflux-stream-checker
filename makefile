@@ -1,7 +1,8 @@
 TARGET  = disk-analysis
 CC      = gcc
 CFLAGS  = -W -Wall -Wextra -g
-LDFLAGS = -lncurses
+LDFLAGS = -lncurses -lpng
+CFLAGS += -I/usr/local/include
 
 SRCS = disk-analysis.c \
        disk-analysis-log.c \
@@ -10,7 +11,8 @@ SRCS = disk-analysis.c \
        input.c \
        kf-info.c \
        kf-oob.c \
-       atari-fs.c
+       atari-fs.c \
+       visualise.c
 
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)

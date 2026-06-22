@@ -141,7 +141,7 @@ void print_hex(char *buffer, uint8_t *val, int n)
 
 void bytestream_push(struct bytestream *stream, uint8_t val, int bits, uint8_t track_num, uint8_t side_num, uint32_t idx, double time_index)
 {
-	(void)track_num; (void)side_num; (void)idx; (void)time_index;
+	(void)track_num; (void)side_num; (void)idx;
 
 	uint32_t index = stream->ptr / 8;
 	uint32_t subidx = stream->ptr % 8;
@@ -158,13 +158,7 @@ void bytestream_push(struct bytestream *stream, uint8_t val, int bits, uint8_t t
 	tmpslice = htons(slice);
 	memcpy( (stream->stream)+index, &tmpslice, sizeof(uint16_t));
 
-	//debug
-//	{
-//		char dbg_buffer[index * 2 + 2];
-//		dbg_buffer[index * 2 + 2] = '\0';
-//		print_hex(dbg_buffer, stream->stream, index + 1);
-//		log_dbg("stream--> %s", dbg_buffer);
-//	}
+	stream->time_idx[index] = time_index;
 
 	stream->ptr += bits;
 
@@ -531,6 +525,8 @@ void parse_data_stream(struct disk *disk, struct track *track)
 				break;
 			}
 
+			sector->meta.id_bit_start = i - PRE_MARK_LEN_BITS;
+
 			i += ID_RECORD_LEN_BITS;
 			parser_state = SEEKING_DATA;
 			rc = sprintf(log_line, "[Phase 2: side:%02u, track:%02u, sector:%02u, size:%u]",
@@ -583,6 +579,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 
 		case FOUND_DATA: {
 			log_dbg("parser_state [%u] found data", parser_state);
+			sector->meta.data_bit_start = i - PRE_MARK_LEN_BITS;
 			int rc = parse_data(disk, sector, stream, i, sector->meta.size);
 			if (rc < 0) {
 				free(sector->data.data);
@@ -616,6 +613,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 				sts_str_len -= strlen(sts_str);
 			}
 			i += rc * 8 * 2;
+			sector->meta.data_bit_end = i;
 
 			parser_state = SEEKING_POST_DATA;
 

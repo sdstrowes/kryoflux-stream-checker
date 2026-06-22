@@ -9,13 +9,13 @@
 
 #include "atari-fs.h"
 #include "disk-analysis-log.h"
+#include "disk-streams.h"
 #include "fluxstream.h"
 #include "input.h"
 #include "mfm.h"
+#include "visualise.h"
 
 #include <sys/queue.h>
-
-#define SIDES      2
 
 void print_help(char *binary_name)
 {
@@ -26,22 +26,8 @@ void print_help(char *binary_name)
 	printf(" -d: enable debug\n");
 	printf(" -h: this help\n");
 	printf(" -o <dir>: extract files to directory\n");
+	printf(" -v <file>: write flux visualisation to PNG file\n");
 }
-
-//struct track_data {
-//	struct track t;
-//	STAILQ_ENTRY(track_data) next;
-//};
-//STAILQ_HEAD(side, track_data);
-
-struct side {
-	struct track t[TRACK_MAX];
-};
-
-struct disk_streams {
-	struct side side[SIDES];
-	char *name_prefix;
-};
 
 void init_struct_disk(struct disk_streams *disk, char *name_prefix)
 {
@@ -233,12 +219,13 @@ static int count_decoded_sectors(struct disk *disk_data)
 int main(int argc, char *argv[])
 {
 	char c;
-	char *fn_prefix = NULL;
-	char *out_dir   = NULL;
+	char *fn_prefix  = NULL;
+	char *out_dir    = NULL;
+	char *vis_file   = NULL;
 	int log_level = LOG_INFO;
 
 	opterr = 0;	// silence error output on bad options
-	while ((c = getopt(argc, argv, "dhn:o:")) != -1) {
+	while ((c = getopt(argc, argv, "dhn:o:v:")) != -1) {
 		switch (c) {
 		case 'n': {
 			fn_prefix = optarg;
@@ -246,6 +233,10 @@ int main(int argc, char *argv[])
 		}
 		case 'o': {
 			out_dir = optarg;
+			break;
+		}
+		case 'v': {
+			vis_file = optarg;
 			break;
 		}
 		case 'd': {
@@ -274,9 +265,14 @@ int main(int argc, char *argv[])
 
 	parse_buffers_from_files(&disk);
 
-	//parse_buffers_from_files(&disk);
-
 	parse_atari_mfm_from_flux(&disk, &disk_data);
+
+	if (vis_file != NULL) {
+		if (generate_disk_image(&disk, vis_file) != 0)
+			log_err("Failed to write visualisation to %s", vis_file);
+		else
+			printf("Visualisation written to: %s\n", vis_file);
+	}
 
 	consolidate_sectors(&disk, &disk_data);
 
