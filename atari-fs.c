@@ -531,6 +531,39 @@ int extract_files(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
 	return 0;
 }
 
+void check_sector_completeness(struct disk *disk_data, struct bpb *bpb)
+{
+	uint16_t total_tracks = bpb->total_sectors / (bpb->sectors_per_track * bpb->num_sides);
+	if (total_tracks > TRACK_MAX)
+		total_tracks = TRACK_MAX;
+
+	int present = 0, total = 0;
+
+	for (uint16_t side = 0; side < bpb->num_sides && side < 2; side++) {
+		for (uint16_t track = 0; track < total_tracks; track++) {
+			char missing_str[64] = "";
+			int  missing_len = 0;
+
+			for (uint16_t sec = 0; sec < bpb->sectors_per_track && sec < MAX_SECTORS; sec++) {
+				total++;
+				if (disk_data->side[side].track[track].sector[sec].data.data != NULL) {
+					present++;
+				} else {
+					missing_len += snprintf(missing_str + missing_len,
+					                        sizeof(missing_str) - missing_len,
+					                        missing_len ? ", %u" : "%u", sec + 1);
+				}
+			}
+
+			if (missing_len > 0)
+				printf("  Side %u, track %2u: missing sectors %s\n", side, track, missing_str);
+		}
+	}
+
+	printf("Sector coverage:\n");
+	printf("  %d/%d sectors present%s\n", present, total, present == total ? " (complete)" : "");
+}
+
 void print_bpb(struct bpb *bpb)
 {
 	char oem_printable[9];

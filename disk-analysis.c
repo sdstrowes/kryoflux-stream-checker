@@ -292,6 +292,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	print_bpb(&bpb);
+	check_sector_completeness(&disk_data, &bpb);
 
 	struct fat fat;
 	if (read_fat(&disk_data, &bpb, &fat) != 0) {
