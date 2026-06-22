@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/time.h>
+#include <time.h>
 
 #include "atari-fs.h"
 #include "disk-analysis-log.h"
@@ -228,6 +230,25 @@ static void format_timestamp(uint8_t *e, char *out)
 	snprintf(out, 17, "%04d-%02d-%02d %02d:%02d", year, month, day, hours, mins);
 }
 
+static time_t fat_to_time_t(uint8_t *e)
+{
+	uint16_t time = (uint16_t)e[22] | ((uint16_t)e[23] << 8);
+	uint16_t date = (uint16_t)e[24] | ((uint16_t)e[25] << 8);
+
+	if (date == 0)
+		return (time_t)-1;
+
+	struct tm t = {0};
+	t.tm_year  = ((date >> 9) & 0x7F) + 80;
+	t.tm_mon   = ((date >> 5) & 0x0F) - 1;
+	t.tm_mday  = date & 0x1F;
+	t.tm_hour  = (time >> 11) & 0x1F;
+	t.tm_min   = (time >> 5) & 0x3F;
+	t.tm_sec   = (time & 0x1F) * 2;
+	t.tm_isdst = -1;
+	return mktime(&t);
+}
+
 static void format_83_name(uint8_t *raw, char *out)
 {
 	int i, nlen = 0, elen = 0;
@@ -347,7 +368,10 @@ static void list_dir(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
 		format_attrs(attr, attrs);
 
 		char ts[17];
-		format_timestamp(e, ts);
+		if (attr & ATTR_SUBDIR)
+			snprintf(ts, sizeof(ts), "                ");
+		else
+			format_timestamp(e, ts);
 
 		char fullname[15];
 		if (attr & ATTR_SUBDIR)
@@ -387,7 +411,7 @@ void print_directory_tree(struct disk *disk_data, struct bpb *bpb, struct fat *f
 
 static int extract_file(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
                          uint16_t first_cluster, uint32_t file_size,
-                         const char *out_path)
+                         const char *out_path, uint8_t *dirent)
 {
 	FILE *f = fopen(out_path, "wb");
 	if (!f) {
@@ -417,6 +441,15 @@ static int extract_file(struct disk *disk_data, struct bpb *bpb, struct fat *fat
 	}
 
 	fclose(f);
+
+	time_t mtime = fat_to_time_t(dirent);
+	if (mtime != (time_t)-1) {
+		struct timeval tv[2];
+		tv[0].tv_sec  = mtime; tv[0].tv_usec = 0;
+		tv[1].tv_sec  = mtime; tv[1].tv_usec = 0;
+		utimes(out_path, tv);
+	}
+
 	return 0;
 }
 
@@ -463,8 +496,15 @@ static void extract_dir(struct disk *disk_data, struct bpb *bpb, struct fat *fat
 					free(sub_buf);
 				}
 			}
+			time_t mtime = fat_to_time_t(e);
+			if (mtime != (time_t)-1) {
+				struct timeval tv[2];
+				tv[0].tv_sec  = mtime; tv[0].tv_usec = 0;
+				tv[1].tv_sec  = mtime; tv[1].tv_usec = 0;
+				utimes(entry_path, tv);
+			}
 		} else {
-			extract_file(disk_data, bpb, fat, first_cluster, file_size, entry_path);
+			extract_file(disk_data, bpb, fat, first_cluster, file_size, entry_path, e);
 		}
 	}
 }

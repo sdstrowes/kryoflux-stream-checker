@@ -333,13 +333,13 @@ int parse_data(struct disk *disk, struct sector *sector, struct bytestream *stre
 		bytestream_get_location(stream, location, data, 2);
 		separate_data_clock(data, &d, &c);
 
-		log_msg("DATA  %02x/%02x/%02x loc:%x] rc:%u length:%u: data:%02x",
-			sector->meta.side,
-			sector->meta.track,
-			sector->meta.sector_num,
-			location,
-			rc, length_bytes,
-			d);
+//		log_msg("DATA  %02x/%02x/%02x loc:%x] rc:%u length:%u: data:%02x",
+//			sector->meta.side,
+//			sector->meta.track,
+//			sector->meta.sector_num,
+//			location,
+//			rc, length_bytes,
+//			d);
 
 		//data[rc] = d;
 
