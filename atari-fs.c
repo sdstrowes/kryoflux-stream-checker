@@ -422,6 +422,7 @@ static int extract_file(struct disk *disk_data, struct bpb *bpb, struct fat *fat
 	uint32_t remaining = file_size;
 	uint16_t cluster = first_cluster;
 	static const uint8_t zeros[512];
+	int missing = 0;
 
 	while (remaining > 0 && cluster >= 2 && !fat_is_end_of_chain(cluster)) {
 		uint16_t lsn = fat_cluster_to_lsn(bpb, cluster);
@@ -432,8 +433,8 @@ static int extract_file(struct disk *disk_data, struct bpb *bpb, struct fat *fat
 			if (sec)
 				fwrite(sec->data.data, 1, to_write, f);
 			else {
-				log_err("Missing sector at LSN %u, writing zeros", lsn + s);
 				fwrite(zeros, 1, to_write, f);
+				missing++;
 			}
 			remaining -= to_write;
 		}
@@ -450,7 +451,7 @@ static int extract_file(struct disk *disk_data, struct bpb *bpb, struct fat *fat
 		utimes(out_path, tv);
 	}
 
-	return 0;
+	return missing;
 }
 
 static void extract_dir(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
@@ -504,7 +505,9 @@ static void extract_dir(struct disk *disk_data, struct bpb *bpb, struct fat *fat
 				utimes(entry_path, tv);
 			}
 		} else {
-			extract_file(disk_data, bpb, fat, first_cluster, file_size, entry_path, e);
+			int missing = extract_file(disk_data, bpb, fat, first_cluster, file_size, entry_path, e);
+			if (missing > 0)
+				log_err("WARNING: %s: %d missing sector(s), written as zeros", entry_path, missing);
 		}
 	}
 }
