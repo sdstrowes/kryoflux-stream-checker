@@ -277,17 +277,11 @@ int parse_id_record(struct sector *sector, struct bytestream *stream, int locati
 
 	sector->meta.calc_crc = crc;
 
-	log_msg("ID record: track:  %u", sector->meta.track);
-	log_msg("ID record: side:   %u", sector->meta.side);
-	log_msg("ID record: sector: %u", sector->meta.sector_num);
-	log_msg("ID record: size:   %u", sector->meta.size);
-
 	if (sector->meta.disk_crc != crc) {
 		log_err("ID record: CRC mismatch; expected %x, got %x", sector->meta.calc_crc, sector->meta.disk_crc);
 		return -1;
 	}
 
-	log_msg("ID record: CRC %04x OK", sector->meta.disk_crc);
 	return 0;
 }
 
@@ -552,7 +546,7 @@ void parse_data_stream(struct disk *disk, struct track *track)
 
 			char sts_str[80];
 			sts_str[0] = '\0';
-			sprintf(sts_str, "[ID Seg: %sOK%s]", KGRN, KNRM);
+			sprintf(sts_str, "[ID Seg: %sOK%s CRC:%04x]", KGRN, KNRM, sector->meta.disk_crc);
 			strncat(log_line, sts_str, sts_str_len);
 			sts_str_len -= strlen(sts_str);
 
