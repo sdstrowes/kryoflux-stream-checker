@@ -19,6 +19,7 @@ void sector_init(struct sector **s)
 	sector->pass_count    = 0;
 	memset(&sector->meta, 0, sizeof(struct sector_meta));
 	memset(&sector->data, 0, sizeof(struct sector_pass));
+	sector->meta.revolution = UINT32_MAX;
 	sector->data.data     = NULL;
 	sector->data.data_len = 0;
 

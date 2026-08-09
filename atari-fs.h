@@ -46,4 +46,18 @@ void     print_fat_summary(struct fat *fat);
 void     print_directory_tree(struct disk *disk_data, struct bpb *bpb, struct fat *fat);
 int      extract_files(struct disk *disk_data, struct bpb *bpb, struct fat *fat, const char *out_dir);
 
+#define SF_FREE    0
+#define SF_BOOT    1
+#define SF_FAT     2
+#define SF_ROOTDIR 3
+#define SF_FILE    4
+
+struct sector_file_info {
+	uint8_t region;
+	char    name[16];
+};
+
+void build_filesystem_map(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
+                           struct sector_file_info map[2][TRACK_MAX][MAX_SECTORS]);
+
 #endif

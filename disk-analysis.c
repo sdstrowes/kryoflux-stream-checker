@@ -12,6 +12,7 @@
 #include "disk-streams.h"
 #include "fluxstream.h"
 #include "input.h"
+#include "json-export.h"
 #include "mfm.h"
 #include "visualise.h"
 
@@ -27,6 +28,7 @@ void print_help(char *binary_name)
 	printf(" -h: this help\n");
 	printf(" -o <dir>: extract files to directory\n");
 	printf(" -v <file>: write flux visualisation to PNG file\n");
+	printf(" -j <dir>: write flux/mfm/filesystem visualisation data to JSON in directory\n");
 }
 
 void init_struct_disk(struct disk_streams *disk, char *name_prefix)
@@ -222,10 +224,11 @@ int main(int argc, char *argv[])
 	char *fn_prefix  = NULL;
 	char *out_dir    = NULL;
 	char *vis_file   = NULL;
+	char *json_dir   = NULL;
 	int log_level = LOG_INFO;
 
 	opterr = 0;	// silence error output on bad options
-	while ((c = getopt(argc, argv, "dhn:o:v:")) != -1) {
+	while ((c = getopt(argc, argv, "dhj:n:o:v:")) != -1) {
 		switch (c) {
 		case 'n': {
 			fn_prefix = optarg;
@@ -237,6 +240,10 @@ int main(int argc, char *argv[])
 		}
 		case 'v': {
 			vis_file = optarg;
+			break;
+		}
+		case 'j': {
+			json_dir = optarg;
 			break;
 		}
 		case 'd': {
@@ -277,7 +284,34 @@ int main(int argc, char *argv[])
 	consolidate_sectors(&disk, &disk_data);
 
 	struct bpb bpb;
-	if (parse_boot_sector(&disk_data, &bpb) != 0) {
+	struct bpb *bpb_ptr = NULL;
+	struct fat fat;
+	struct fat *fat_ptr = NULL;
+
+	int have_bpb = (parse_boot_sector(&disk_data, &bpb) == 0);
+	if (have_bpb) {
+		bpb_ptr = &bpb;
+		print_bpb(&bpb);
+		check_sector_completeness(&disk_data, &bpb);
+
+		if (read_fat(&disk_data, &bpb, &fat) == 0) {
+			fat_ptr = &fat;
+			print_fat_summary(&fat);
+			print_directory_tree(&disk_data, &bpb, &fat);
+		}
+		else {
+			log_err("Failed to read FAT");
+		}
+	}
+
+	if (json_dir != NULL) {
+		if (export_disk_json(&disk, &disk_data, bpb_ptr, fat_ptr, json_dir) != 0)
+			log_err("Failed to write JSON export to %s", json_dir);
+		else
+			printf("JSON export written to: %s\n", json_dir);
+	}
+
+	if (!have_bpb) {
 		int decoded = count_decoded_sectors(&disk_data);
 		if (decoded > 0)
 			printf("Disk has %d readable MFM sectors but no valid boot sector.\n"
@@ -285,18 +319,14 @@ int main(int argc, char *argv[])
 			       decoded);
 		else
 			printf("No readable sectors found on disk.\n");
+		free_struct_disk(&disk);
 		return 1;
 	}
-	print_bpb(&bpb);
-	check_sector_completeness(&disk_data, &bpb);
 
-	struct fat fat;
-	if (read_fat(&disk_data, &bpb, &fat) != 0) {
-		log_err("Failed to read FAT");
+	if (fat_ptr == NULL) {
+		free_struct_disk(&disk);
 		return 1;
 	}
-	print_fat_summary(&fat);
-	print_directory_tree(&disk_data, &bpb, &fat);
 
 	if (out_dir != NULL) {
 		if (extract_files(&disk_data, &bpb, &fat, out_dir) == 0)

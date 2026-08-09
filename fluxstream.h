@@ -47,6 +47,16 @@ struct sector_meta {
 	uint32_t id_bit_start;
 	uint32_t data_bit_start;
 	uint32_t data_bit_end;
+
+	/* Which revolution (0-indexed pass between two index pulses) this
+	 * sector was decoded from, and its ID/data span as a fraction
+	 * (0.0-1.0) of that revolution's total time. Computed immediately
+	 * after the pass completes, since track->stream (and its time_idx[])
+	 * is destroyed and rebuilt for every subsequent pass. UINT32_MAX
+	 * means "not yet tagged". */
+	uint32_t revolution;
+	double id_frac0,   id_frac1;
+	double data_frac0, data_frac1;
 };
 
 struct sector_pass {

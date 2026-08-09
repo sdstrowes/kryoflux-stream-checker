@@ -409,6 +409,109 @@ void print_directory_tree(struct disk *disk_data, struct bpb *bpb, struct fat *f
 	free(buf);
 }
 
+static void mark_lsn(struct bpb *bpb, struct sector_file_info map[2][TRACK_MAX][MAX_SECTORS],
+                      uint16_t lsn, uint8_t region, const char *name)
+{
+	if (lsn >= bpb->total_sectors)
+		return;
+
+	uint16_t track  = lsn / (bpb->sectors_per_track * bpb->num_sides);
+	uint16_t side   = (lsn / bpb->sectors_per_track) % bpb->num_sides;
+	uint16_t sector = lsn % bpb->sectors_per_track;
+
+	if (track >= TRACK_MAX || side >= 2 || sector >= MAX_SECTORS)
+		return;
+
+	struct sector_file_info *info = &map[side][track][sector];
+	info->region = region;
+	if (name != NULL)
+		strncpy(info->name, name, sizeof(info->name) - 1);
+}
+
+static void mark_cluster_chain(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
+                                uint16_t first_cluster, uint8_t region, const char *name,
+                                struct sector_file_info map[2][TRACK_MAX][MAX_SECTORS])
+{
+	(void)disk_data;
+	uint16_t cluster = first_cluster;
+	uint32_t chained = 0;
+	while (cluster >= 2 && !fat_is_end_of_chain(cluster) && chained < fat->num_entries) {
+		uint16_t lsn = fat_cluster_to_lsn(bpb, cluster);
+		for (uint8_t s = 0; s < bpb->sectors_per_cluster; s++)
+			mark_lsn(bpb, map, lsn + s, region, name);
+		cluster = fat_next_cluster(fat, cluster);
+		chained++;
+	}
+}
+
+static void walk_dir_for_map(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
+                              uint8_t *buf, uint32_t size, int depth,
+                              struct sector_file_info map[2][TRACK_MAX][MAX_SECTORS])
+{
+	uint32_t num_entries = size / DIRENT_SIZE;
+	for (uint32_t i = 0; i < num_entries; i++) {
+		uint8_t *e = buf + i * DIRENT_SIZE;
+
+		if (e[0] == 0x00)
+			break;
+		if (e[0] == 0xE5)
+			continue;
+
+		uint8_t attr = e[11];
+		if (attr & ATTR_VOLUME)
+			continue;
+
+		char name[13];
+		format_83_name(e, name);
+
+		if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+			continue;
+
+		uint16_t first_cluster = (uint16_t)e[26] | ((uint16_t)e[27] << 8);
+
+		if (attr & ATTR_SUBDIR) {
+			mark_cluster_chain(disk_data, bpb, fat, first_cluster, SF_ROOTDIR, name, map);
+
+			if (depth < MAX_DIR_DEPTH - 1 && first_cluster >= 2) {
+				uint32_t sub_size;
+				uint8_t *sub_buf = read_dir_data(disk_data, bpb, fat,
+				                                 first_cluster, 0, &sub_size);
+				if (sub_buf) {
+					walk_dir_for_map(disk_data, bpb, fat, sub_buf, sub_size, depth + 1, map);
+					free(sub_buf);
+				}
+			}
+		} else {
+			mark_cluster_chain(disk_data, bpb, fat, first_cluster, SF_FILE, name, map);
+		}
+	}
+}
+
+void build_filesystem_map(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
+                           struct sector_file_info map[2][TRACK_MAX][MAX_SECTORS])
+{
+	memset(map, 0, sizeof(struct sector_file_info) * 2 * TRACK_MAX * MAX_SECTORS);
+
+	mark_lsn(bpb, map, 0, SF_BOOT, NULL);
+
+	uint16_t i;
+	for (i = 0; i < bpb->sectors_per_fat; i++)
+		mark_lsn(bpb, map, bpb->fat1_sector + i, SF_FAT, NULL);
+	if (bpb->num_fats >= 2)
+		for (i = 0; i < bpb->sectors_per_fat; i++)
+			mark_lsn(bpb, map, bpb->fat2_sector + i, SF_FAT, NULL);
+
+	for (i = 0; i < bpb->root_dir_sectors; i++)
+		mark_lsn(bpb, map, bpb->root_dir_sector + i, SF_ROOTDIR, NULL);
+
+	uint32_t size;
+	uint8_t *buf = read_dir_data(disk_data, bpb, fat, 0, 1, &size);
+	if (buf != NULL) {
+		walk_dir_for_map(disk_data, bpb, fat, buf, size, 1, map);
+		free(buf);
+	}
+}
+
 static int extract_file(struct disk *disk_data, struct bpb *bpb, struct fat *fat,
                          uint16_t first_cluster, uint32_t file_size,
                          const char *out_path, uint8_t *dirent)

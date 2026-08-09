@@ -722,6 +722,43 @@ int mfm_decode_passes(struct track *track, uint32_t index, uint32_t next_index)
 
 
 
+/* track->stream (and its time_idx[]) is destroyed and rebuilt by the next
+ * call to mfm_decode_passes(), so any sector decoded in this pass has its
+ * bit offsets converted to time-fractions of this revolution right now.
+ * LIST_INSERT_HEAD() means freshly-added sectors are a prefix of the list;
+ * the first already-tagged sector marks the end of this pass's sectors. */
+static void tag_revolution_sectors(struct track *track, uint32_t revolution,
+                                    uint32_t first_index, uint32_t last_index)
+{
+	double total_time = 0.0;
+	uint32_t idx;
+	for (idx = first_index; idx < last_index && idx < track->flux_buf_idx; idx++)
+		total_time += track->flux_buffer[idx].val / track->sample_clock;
+
+	struct sector *sector;
+	LIST_FOREACH(sector, &track->sectors, next) {
+		if (sector->meta.revolution != UINT32_MAX)
+			break;
+
+		sector->meta.revolution = revolution;
+
+		if (total_time <= 0.0)
+			continue;
+
+		uint32_t id_end = sector->meta.id_bit_start + PRE_MARK_LEN_BITS + ID_RECORD_LEN_BITS;
+		if (id_end / 8 < STREAM_BUFFER_SIZE) {
+			sector->meta.id_frac0 = track->stream->time_idx[sector->meta.id_bit_start / 8] / total_time;
+			sector->meta.id_frac1 = track->stream->time_idx[id_end / 8] / total_time;
+		}
+
+		if (sector->meta.data_bit_end > sector->meta.data_bit_start &&
+		    sector->meta.data_bit_end / 8 < STREAM_BUFFER_SIZE) {
+			sector->meta.data_frac0 = track->stream->time_idx[sector->meta.data_bit_start / 8] / total_time;
+			sector->meta.data_frac1 = track->stream->time_idx[sector->meta.data_bit_end   / 8] / total_time;
+		}
+	}
+}
+
 int decode_flux_to_mfm(struct disk *disk, struct track *track)
 {
 //	uint32_t pass;
@@ -786,6 +823,7 @@ int decode_flux_to_mfm(struct disk *disk, struct track *track)
 		mfm_decode_passes(track, first_index, last_index);
 		log_dbg("MFM [S:%x, T:%02u] Gonna parse the data out", track->side, track->track);
 		parse_data_stream(disk, track);
+		tag_revolution_sectors(track, i, first_index, last_index);
 	}
 
 	return 0;

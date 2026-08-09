@@ -1,0 +1,879 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Disk Surface Viewer</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: #111; color: #ddd; font-family: -apple-system, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+  }
+  #controls {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    display: flex; align-items: center; gap: 16px;
+    padding: 8px 14px; background: #1a1a1a; border-bottom: 1px solid #333;
+    font-size: 13px;
+  }
+  #controls label { display: flex; align-items: center; gap: 6px; }
+  #controls select {
+    background: #222; color: #ddd; border: 1px solid #444; border-radius: 4px;
+    padding: 3px 6px; font-size: 13px;
+  }
+  #controls select:disabled { opacity: 0.4; }
+  #status { margin-left: auto; color: #888; }
+  #legend { display: flex; gap: 10px; align-items: center; font-size: 12px; color: #aaa; }
+  #legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  #tooltip {
+    position: fixed; pointer-events: none; z-index: 20;
+    background: rgba(20,20,20,0.92); border: 1px solid #444; border-radius: 4px;
+    padding: 6px 8px; font-size: 12px; line-height: 1.5; white-space: pre; display: none;
+  }
+  canvas { display: block; flex: 1 1 auto; min-width: 0; height: 100%; }
+  #main {
+    position: fixed; top: 41px; left: 0; right: 0; bottom: 0;
+    display: flex;
+  }
+  #filepanel {
+    width: 260px; flex: 0 0 260px; overflow-y: auto;
+    background: #161616; border-left: 1px solid #333;
+    padding: 6px 0;
+  }
+  #filepanel .panel-title {
+    padding: 6px 10px; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  #filepanel .panel-hint {
+    padding: 0 10px 8px; color: #777; font-size: 10.5px; line-height: 1.5;
+    border-bottom: 1px solid #2a2a2a; margin-bottom: 4px;
+  }
+  #filepanel .panel-hint .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 3px; vertical-align: -1px; }
+  .file-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 4px 10px; cursor: pointer; font-size: 12px;
+  }
+  .file-row:hover { background: #222; }
+  .file-row.selected { background: #2a3a55; }
+  .file-name {
+    flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .file-side {
+    flex: 0 0 auto; font-size: 10px; color: #aaa; background: #2a2a2a;
+    border-radius: 3px; padding: 1px 4px; cursor: help;
+  }
+  .file-dots { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot-ok      { background: #32c832; }
+  .dot-fail    { background: #c83232; }
+  .dot-missing { background: #3a3a3a; }
+  .dot.current { box-shadow: 0 0 0 2px #fff; }
+  .dot-sep { width: 1px; height: 10px; background: #3a3a3a; margin: 0 3px; display: inline-block; }
+  .dot-final { border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="controls">
+  <label>Side
+    <select id="side">
+      <option value="0">0</option>
+      <option value="1">1</option>
+      <option value="both">Both</option>
+    </select>
+  </label>
+  <label>Layer
+    <select id="layer">
+      <option value="flux">Flux</option>
+      <option value="mfm">MFM</option>
+      <option value="filesystem">Filesystem</option>
+      <option value="final">Final (recovered)</option>
+    </select>
+  </label>
+  <label>Revolution
+    <select id="revolution"><option value="0">0</option></select>
+  </label>
+  <div id="legend"></div>
+  <div id="status">loading disk.json...</div>
+</div>
+<div id="main">
+  <canvas id="canvas"></canvas>
+  <div id="filepanel">
+    <div class="panel-title">Files — read status per pass</div>
+    <div class="panel-hint">Click a file to highlight its sectors on the disk.
+      Dots = each pass; square = Final (recovered across all passes combined).
+      Outline color on the disk matches:
+      <span class="sw" style="background:#3ee83e"></span>ok
+      <span class="sw" style="background:#ff4444"></span>fail
+      <span class="sw" style="background:#999"></span>not found</div>
+    <div id="filelist"></div>
+  </div>
+</div>
+<div id="tooltip"></div>
+
+<script>
+'use strict';
+
+/* Sequential blue->green->amber for the ordinal 2T/3T/4T flux intervals,
+ * plus a hue well outside that ramp (reddish purple) for out-of-band so it
+ * reads as "not a valid interval" rather than "a longer one". Colorblind-safe
+ * palette (Okabe-Ito derived) so the categories stay distinct under common
+ * color vision deficiencies too. */
+const FLUX_COLORS = {
+  '2': '#56b4e9', '3': '#009e73', '4': '#e69f00', 'x': '#cc79a7', '.': '#282828'
+};
+const COL_GAP      = '#464646';
+const COL_ID_OK    = '#3264dc';
+const COL_ID_ERR   = '#32c8c8';
+const COL_DATA_OK  = '#32c832';
+const COL_DATA_ERR = '#c83232';
+const COL_EMPTY    = '#141414';
+const REGION_COLORS = {
+  boot:    '#ffc800',
+  fat:     '#b450c8',
+  rootdir: '#50a0dc',
+  free:    '#282828',
+};
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+const statusEl = document.getElementById('status');
+const sideSel = document.getElementById('side');
+const layerSel = document.getElementById('layer');
+const revSel = document.getElementById('revolution');
+const legendEl = document.getElementById('legend');
+
+let diskData = null;
+let side = '0'; // '0' | '1' | 'both' -- raw <select id="side"> value
+let layer = 'flux';
+let revolution = 0;
+
+let selected = null;          // { side, track }
+let selectedFile = null;      // filename, highlighted on the filesystem ring
+let detailCache = {};         // "side-track" -> parsed flux json
+let detailLoading = null;
+
+let fileSectors = {};         // filename -> [{side, track, sector}]
+let fileStatus = {};          // filename -> [ 'ok' | 'fail' | 'missing', ... one per revolution ]
+
+let view = { scale: 1, tx: 0, ty: 0 }; // logical->screen: screen = logical*scale + t
+let dragging = false, dragMoved = false, dragStart = null;
+
+const R_MAX_FRAC = 0.46; // fraction of min(canvas dim)
+const R_MIN_FRAC = 0.12;
+
+const filelistEl = document.getElementById('filelist');
+
+function resize() {
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+  draw();
+}
+window.addEventListener('resize', resize);
+
+function activeSides() {
+  if (side === 'both') return [0, 1];
+  return [+side];
+}
+
+/* One disk per active side, laid out side by side across the canvas so
+ * "both" doesn't need to squeeze two sides into one set of rings. */
+function geometry() {
+  const sides = activeSides();
+  const perDiskWidth = canvas.width / sides.length;
+  const dim = Math.min(perDiskWidth, canvas.height);
+  const rMax = dim * R_MAX_FRAC;
+  const rMin = dim * R_MIN_FRAC;
+  const trackMax = diskData ? diskData.track_max : 84;
+  const ringWidth = (rMax - rMin) / trackMax;
+  const centers = sides.map((s, i) => ({
+    side: s,
+    cx: perDiskWidth * (i + 0.5),
+    cy: canvas.height / 2,
+  }));
+  return { rMax, rMin, trackMax, ringWidth, centers };
+}
+
+function angleAt(frac) {
+  return -Math.PI / 2 + frac * Math.PI * 2;
+}
+
+function fluxClassChar(sec) {
+  if (sec > 0.0000034 && sec < 0.0000046) return '2';
+  if (sec > 0.0000054 && sec < 0.0000066) return '3';
+  if (sec > 0.0000074 && sec < 0.0000086) return '4';
+  return 'x';
+}
+
+function screenToLogical(sx, sy) {
+  return { x: (sx - view.tx) / view.scale, y: (sy - view.ty) / view.scale };
+}
+
+function applyTransform() {
+  ctx.setTransform(view.scale, 0, 0, view.scale, view.tx, view.ty);
+}
+
+function resetView() {
+  const g = geometry();
+  view.scale = 1;
+  view.tx = 0;
+  view.ty = 0;
+}
+
+// ---- data access helpers ----
+
+function trackInfo(s, t) {
+  return diskData.side[s].track[t];
+}
+
+function detailKey(s, t) { return s + '-' + t; }
+
+function ensureDetailLoaded(s, t) {
+  const key = detailKey(s, t);
+  if (detailCache[key] || detailLoading === key) return;
+  detailLoading = key;
+  statusEl.textContent = 'loading track ' + t + '/' + s + '...';
+  const tn = String(t).padStart(2, '0');
+  fetch('flux/' + s + '-' + tn + '.json')
+    .then(r => r.json())
+    .then(data => {
+      detailCache[key] = data;
+      detailLoading = null;
+      if (selected && selected.side === s && selected.track === t) {
+        populateRevolutionSelect(data.revolutions.length);
+      }
+      statusEl.textContent = '';
+      draw();
+    })
+    .catch(err => {
+      detailLoading = null;
+      statusEl.textContent = 'failed to load track detail: ' + err;
+    });
+}
+
+function populateRevolutionSelect(n) {
+  const prev = revolution;
+  revSel.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = i;
+    revSel.appendChild(o);
+  }
+  revolution = Math.min(prev, Math.max(0, n - 1));
+  revSel.value = revolution;
+}
+
+/* Every physical sector belonging to each file, gathered across both sides
+ * (a cluster chain can cross sides/tracks freely under FAT12). */
+function buildFileIndex() {
+  const map = {};
+  for (let s = 0; s < diskData.sides; s++) {
+    for (const t of diskData.side[s].track) {
+      for (const fs of t.filesystem) {
+        if (fs.region !== 'file') continue;
+        if (!map[fs.file]) map[fs.file] = [];
+        map[fs.file].push({ side: s, track: t.num, sector: fs.sector });
+      }
+    }
+  }
+  return map;
+}
+
+/* Per file, per revolution: did every sector that makes up this file decode
+ * correctly on that specific pass? 'fail' if any sector's data CRC failed
+ * that pass, 'missing' if a sector was never even attempted that pass
+ * (revolution ran out, or the ID/data mark wasn't found), else 'ok'. */
+function computeFileStatus(maxRev) {
+  const status = {};
+  for (const [name, locs] of Object.entries(fileSectors)) {
+    const row = [];
+    for (let r = 0; r < maxRev; r++) {
+      let anyFail = false, anyMissing = false;
+      for (const loc of locs) {
+        const info = trackInfo(loc.side, loc.track);
+        const sec = info.sectors.find(se => se.num === loc.sector && se.revolution === r);
+        if (!sec) anyMissing = true;
+        else if (!sec.data_ok) anyFail = true;
+      }
+      row.push(anyFail ? 'fail' : anyMissing ? 'missing' : 'ok');
+    }
+    status[name] = row;
+  }
+  return status;
+}
+
+/* Per file: is every sector it's made of recovered by AT LEAST ONE pass,
+ * combined (i.e. what -o extraction would actually produce)? Mirrors
+ * drawFinalRing()/sectorRecovered() but at whole-file granularity. */
+function computeFileFinalStatus() {
+  const status = {};
+  for (const [name, locs] of Object.entries(fileSectors)) {
+    let allRecovered = true;
+    for (const loc of locs) {
+      const info = trackInfo(loc.side, loc.track);
+      if (!sectorRecovered(info, loc.sector)) { allRecovered = false; break; }
+    }
+    status[name] = allRecovered ? 'ok' : 'fail';
+  }
+  return status;
+}
+
+/* Collapse a list of sector numbers into "1-4,6,8-9" style ranges. */
+function collapseRanges(nums) {
+  const sorted = [...new Set(nums)].sort((a, b) => a - b);
+  const ranges = [];
+  let start = sorted[0], prev = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === prev + 1) { prev = sorted[i]; continue; }
+    ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+    start = prev = sorted[i];
+  }
+  if (sorted.length) ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+  return ranges.join(',');
+}
+
+/* "side 0: track 2 sectors 1-9; track 3 sectors 1-9" style breakdown for a
+ * file's tooltip, grouped by side then track. */
+function formatFileLocations(locs) {
+  const bySide = {};
+  for (const loc of locs) {
+    (bySide[loc.side] ??= {});
+    (bySide[loc.side][loc.track] ??= []).push(loc.sector);
+  }
+  const lines = [];
+  for (const s of Object.keys(bySide).sort()) {
+    const tracks = Object.keys(bySide[s]).map(Number).sort((a, b) => a - b);
+    lines.push(`side ${s}:`);
+    for (const t of tracks)
+      lines.push(`  track ${t}: sectors ${collapseRanges(bySide[s][t])}`);
+  }
+  return lines.join('\n');
+}
+
+function buildFilePanel(maxRev) {
+  fileSectors = buildFileIndex();
+  fileStatus = computeFileStatus(maxRev);
+  const finalStatus = computeFileFinalStatus();
+
+  filelistEl.innerHTML = '';
+  const names = Object.keys(fileStatus).sort();
+  for (const name of names) {
+    const row = document.createElement('div');
+    row.className = 'file-row';
+    if (name === selectedFile) row.classList.add('selected');
+
+    const label = document.createElement('span');
+    label.className = 'file-name';
+    label.textContent = name;
+    label.title = name;
+    row.appendChild(label);
+
+    const sides = [...new Set(fileSectors[name].map(l => l.side))].sort();
+    const sideBadge = document.createElement('span');
+    sideBadge.className = 'file-side';
+    sideBadge.textContent = 'S' + sides.join(',');
+    sideBadge.title = formatFileLocations(fileSectors[name]);
+    row.appendChild(sideBadge);
+
+    const dots = document.createElement('span');
+    dots.className = 'file-dots';
+    fileStatus[name].forEach((st, r) => {
+      const d = document.createElement('span');
+      d.className = 'dot dot-rev dot-' + st + (r === revolution ? ' current' : '');
+      d.title = 'pass ' + r + ': ' + st;
+      dots.appendChild(d);
+    });
+
+    const sep = document.createElement('span');
+    sep.className = 'dot-sep';
+    dots.appendChild(sep);
+
+    const finalDot = document.createElement('span');
+    finalDot.className = 'dot dot-final dot-' + finalStatus[name] + (layer === 'final' ? ' current' : '');
+    finalDot.title = 'final (recovered across all passes): ' + finalStatus[name];
+    dots.appendChild(finalDot);
+
+    row.appendChild(dots);
+
+    row.addEventListener('click', () => {
+      selectedFile = (selectedFile === name) ? null : name;
+      buildFilePanel(maxRev);
+      draw();
+    });
+
+    filelistEl.appendChild(row);
+  }
+}
+
+function updateFilePanelCurrentRevolution() {
+  const rows = filelistEl.querySelectorAll('.file-row');
+  rows.forEach(row => {
+    row.querySelectorAll('.dot-rev').forEach((d, r) => d.classList.toggle('current', r === revolution));
+    row.querySelectorAll('.dot-final').forEach(d => d.classList.toggle('current', layer === 'final'));
+  });
+}
+
+/* Find the sector entry (from disk.json, full-res) for a given sector_num,
+ * preferring the currently selected revolution but falling back to the
+ * lowest revolution that has one, since not every revolution successfully
+ * decodes every sector. */
+function findSectorEntry(s, t, sectorNum) {
+  const sectors = trackInfo(s, t).sectors;
+  let best = null;
+  for (const sec of sectors) {
+    if (sec.num !== sectorNum) continue;
+    if (sec.revolution === revolution) return sec;
+    if (best === null || sec.revolution < best.revolution) best = sec;
+  }
+  return best;
+}
+
+// ---- rendering ----
+
+function strokeArc(radius, width, a0, a1, color) {
+  if (a1 <= a0) a1 = a0 + 0.0006;
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.arc(0, 0, radius, a0, a1, false);
+  ctx.stroke();
+}
+
+function drawFluxRing(s, t, radius, width) {
+  const info = trackInfo(s, t);
+  const key = detailKey(s, t);
+  const detail = detailCache[key];
+
+  if (detail && detail.revolutions[revolution]) {
+    const rev = detail.revolutions[revolution];
+    const total = rev.total_time;
+    if (total <= 0) return;
+    let elapsed = 0;
+    for (const val of rev.flux) {
+      const dur = val / detail.sample_clock;
+      const a0 = angleAt(elapsed / total);
+      const a1 = angleAt((elapsed + dur) / total);
+      strokeArc(radius, width, a0, a1, FLUX_COLORS[fluxClassChar(dur)]);
+      elapsed += dur;
+    }
+    return;
+  }
+
+  // coarse overview fallback (revolution 0 only)
+  const ov = info.flux_overview;
+  const n = ov.length;
+  for (let i = 0; i < n; i++) {
+    const a0 = angleAt(i / n);
+    const a1 = angleAt((i + 1) / n);
+    strokeArc(radius, width, a0, a1, FLUX_COLORS[ov[i]] || FLUX_COLORS['.']);
+  }
+}
+
+function drawMfmRing(s, t, radius, width) {
+  strokeArc(radius, width, angleAt(0), angleAt(1), COL_GAP);
+
+  const info = trackInfo(s, t);
+  for (const sec of info.sectors) {
+    if (sec.revolution !== revolution) continue;
+    strokeArc(radius, width, angleAt(sec.id_frac0), angleAt(sec.id_frac1),
+      sec.id_ok ? COL_ID_OK : COL_ID_ERR);
+    if (sec.data_frac1 > sec.data_frac0) {
+      strokeArc(radius, width, angleAt(sec.data_frac0), angleAt(sec.data_frac1),
+        sec.data_ok ? COL_DATA_OK : COL_DATA_ERR);
+    }
+  }
+}
+
+const fileColorCache = {};
+function fileColor(name) {
+  if (!name) return REGION_COLORS.free;
+  if (fileColorCache[name]) return fileColorCache[name];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  const c = `hsl(${hue}, 55%, 55%)`;
+  fileColorCache[name] = c;
+  return c;
+}
+
+function drawFilesystemRing(s, t, radius, width) {
+  strokeArc(radius, width, angleAt(0), angleAt(1), COL_EMPTY);
+
+  const info = trackInfo(s, t);
+  for (const fsEntry of info.filesystem) {
+    const sec = findSectorEntry(s, t, fsEntry.sector);
+    if (!sec || sec.data_frac1 <= sec.data_frac0) continue;
+
+    const a0 = angleAt(sec.data_frac0), a1 = angleAt(sec.data_frac1);
+
+    let color;
+    if (fsEntry.region === 'file' || fsEntry.region === 'rootdir') {
+      color = fileColor(fsEntry.file);
+    } else {
+      color = REGION_COLORS[fsEntry.region] || REGION_COLORS.free;
+    }
+    strokeArc(radius, width, a0, a1, color);
+
+    // Wash the sector with red/dim depending on THIS pass's outcome,
+    // independent of whichever pass its geometry/identity came from.
+    const passSec = info.sectors.find(se => se.num === fsEntry.sector && se.revolution === revolution);
+    if (!passSec) {
+      strokeArc(radius, width, a0, a1, 'rgba(0,0,0,0.55)');
+    } else if (!passSec.data_ok) {
+      strokeArc(radius, width, a0, a1, 'rgba(220,0,0,0.55)');
+    }
+
+    // thin marker for the ID field so sector boundaries stay visible
+    strokeArc(radius, width * 0.35, angleAt(sec.id_frac0), angleAt(sec.id_frac1), '#888');
+  }
+}
+
+/* True if any revolution decoded this physical sector cleanly (both ID and
+ * data CRC ok) - i.e. what disk-analysis's consolidate_sectors() would keep
+ * for -o extraction, regardless of which specific pass supplied it. */
+function sectorRecovered(info, sectorNum) {
+  return info.sectors.some(se => se.num === sectorNum && se.id_ok && se.data_ok);
+}
+
+/* "Final" layer: what actually ends up in an extracted file - every sector
+ * shown using whichever pass recovered it (any pass, not just the one
+ * selected in the revolution dropdown), with sectors that never decoded
+ * cleanly in ANY pass marked as permanently unrecoverable. */
+function drawFinalRing(s, t, radius, width) {
+  strokeArc(radius, width, angleAt(0), angleAt(1), COL_EMPTY);
+
+  const info = trackInfo(s, t);
+  for (const fsEntry of info.filesystem) {
+    const sec = findSectorEntry(s, t, fsEntry.sector);
+    if (!sec || sec.data_frac1 <= sec.data_frac0) continue;
+
+    const a0 = angleAt(sec.data_frac0), a1 = angleAt(sec.data_frac1);
+
+    let color;
+    if (fsEntry.region === 'file' || fsEntry.region === 'rootdir') {
+      color = fileColor(fsEntry.file);
+    } else {
+      color = REGION_COLORS[fsEntry.region] || REGION_COLORS.free;
+    }
+    strokeArc(radius, width, a0, a1, color);
+
+    if (!sectorRecovered(info, fsEntry.sector)) {
+      strokeArc(radius, width, a0, a1, 'rgba(220,0,0,0.6)');
+    }
+
+    strokeArc(radius, width * 0.35, angleAt(sec.id_frac0), angleAt(sec.id_frac1), '#888');
+  }
+}
+
+function drawRing(s, t, radius, width) {
+  if (layer === 'flux') drawFluxRing(s, t, radius, width);
+  else if (layer === 'mfm') drawMfmRing(s, t, radius, width);
+  else if (layer === 'final') drawFinalRing(s, t, radius, width);
+  else drawFilesystemRing(s, t, radius, width);
+}
+
+const HIGHLIGHT_COLORS = { ok: '#3ee83e', fail: '#ff4444', missing: '#999999' };
+
+/* Angular spans (in radians, already through angleAt()) covered by the
+ * selected file's sectors on this side/track, used to punch a full-opacity
+ * "spotlight" through the dimmed ring regardless of which layer is showing -
+ * flux/MFM don't otherwise know about files. Each span also carries THIS
+ * sector's outcome on the currently selected revolution specifically, so a
+ * file-level "fail" (worst of all its sectors) can be traced to the exact
+ * sector and pass responsible. */
+function highlightSpansForTrack(s, t) {
+  if (!selectedFile || !fileSectors[selectedFile]) return [];
+  const info = trackInfo(s, t);
+  const spans = [];
+  for (const loc of fileSectors[selectedFile]) {
+    if (loc.side !== s || loc.track !== t) continue;
+    const sec = findSectorEntry(s, t, loc.sector);
+    if (!sec || sec.data_frac1 <= sec.data_frac0) continue;
+
+    let status;
+    if (layer === 'final') {
+      status = sectorRecovered(info, loc.sector) ? 'ok' : 'fail';
+    } else {
+      const passSec = info.sectors.find(se => se.num === loc.sector && se.revolution === revolution);
+      status = !passSec ? 'missing' : (passSec.data_ok ? 'ok' : 'fail');
+    }
+    spans.push({ a0: angleAt(sec.data_frac0), a1: angleAt(sec.data_frac1), status });
+  }
+  return spans;
+}
+
+function draw() {
+  if (!diskData) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const g = geometry();
+  applyTransform();
+
+  for (const dc of g.centers) {
+    ctx.save();
+    ctx.translate(dc.cx, dc.cy);
+
+    for (let t = 0; t < g.trackMax; t++) {
+      const radius = g.rMax - (t + 0.5) * g.ringWidth;
+      const width = g.ringWidth * 0.92;
+
+      const spans = highlightSpansForTrack(dc.side, t);
+
+      ctx.globalAlpha = selectedFile ? 0.2 : 1;
+      drawRing(dc.side, t, radius, width);
+      ctx.globalAlpha = 1;
+
+      for (const sp of spans) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, radius + width, sp.a0, sp.a1);
+        ctx.closePath();
+        ctx.clip();
+        drawRing(dc.side, t, radius, width);
+        ctx.restore();
+
+        ctx.save();
+        ctx.strokeStyle = HIGHLIGHT_COLORS[sp.status];
+        ctx.lineWidth = 1.6 / view.scale;
+        if (sp.status === 'missing') ctx.setLineDash([4 / view.scale, 3 / view.scale]);
+        ctx.beginPath();
+        ctx.arc(0, 0, radius - width / 2, sp.a0, sp.a1);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, 0, radius + width / 2, sp.a0, sp.a1);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      if (selected && selected.side === dc.side && selected.track === t) {
+        ctx.save();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5 / view.scale;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius - width / 2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, 0, radius + width / 2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // index mark at angle 0 (top)
+    ctx.save();
+    ctx.strokeStyle = '#ffdc00';
+    ctx.lineWidth = 2 / view.scale;
+    ctx.beginPath();
+    ctx.moveTo(0, -g.rMax - g.ringWidth);
+    ctx.lineTo(0, -g.rMin + g.ringWidth);
+    ctx.stroke();
+    ctx.restore();
+
+    if (g.centers.length > 1) {
+      ctx.save();
+      ctx.fillStyle = '#888';
+      ctx.font = (13 / view.scale) + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('side ' + dc.side, 0, g.rMax + g.ringWidth * 3);
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+}
+
+// ---- legend ----
+
+function buildLegend() {
+  legendEl.innerHTML = '';
+  let entries;
+  if (layer === 'flux') {
+    entries = [['4us (2T)', FLUX_COLORS['2']], ['6us (3T)', FLUX_COLORS['3']], ['8us (4T)', FLUX_COLORS['4']], ['out-of-band', FLUX_COLORS['x']]];
+  } else if (layer === 'mfm') {
+    entries = [['ID ok', COL_ID_OK], ['ID err', COL_ID_ERR], ['data ok', COL_DATA_OK], ['data err', COL_DATA_ERR]];
+  } else if (layer === 'final') {
+    entries = [['boot', REGION_COLORS.boot], ['fat', REGION_COLORS.fat], ['dir', REGION_COLORS.rootdir], ['file (per-name color)', '#999'], ['unrecoverable (all passes failed)', 'rgba(220,0,0,0.85)']];
+  } else {
+    entries = [['boot', REGION_COLORS.boot], ['fat', REGION_COLORS.fat], ['dir', REGION_COLORS.rootdir], ['file (per-name color)', '#999']];
+  }
+  for (const [label, color] of entries) {
+    const span = document.createElement('span');
+    span.innerHTML = `<span class="sw" style="background:${color}"></span>${label}`;
+    legendEl.appendChild(span);
+  }
+}
+
+// ---- interaction ----
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const factor = Math.pow(1.0015, -e.deltaY);
+  const before = screenToLogical(e.clientX, e.clientY);
+  view.scale = Math.min(400, Math.max(0.3, view.scale * factor));
+  const after = screenToLogical(e.clientX, e.clientY);
+  view.tx += (after.x - before.x) * view.scale;
+  view.ty += (after.y - before.y) * view.scale;
+  draw();
+}, { passive: false });
+
+canvas.addEventListener('mousedown', (e) => {
+  dragging = true; dragMoved = false;
+  dragStart = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (dragging) {
+    const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
+    view.tx = dragStart.tx + dx;
+    view.ty = dragStart.ty + dy;
+    draw();
+    tooltip.style.display = 'none';
+    return;
+  }
+  hoverTooltip(e);
+});
+
+window.addEventListener('mouseup', (e) => {
+  if (dragging && !dragMoved) handleClick(e);
+  dragging = false;
+});
+
+/* Resolves a screen point to whichever disk (side) it falls within -
+ * relevant once "both" mode draws two disks side by side. */
+function pointToTrackAngle(clientX, clientY) {
+  const g = geometry();
+  const logical = screenToLogical(clientX, clientY);
+
+  for (const dc of g.centers) {
+    const x = logical.x - dc.cx, y = logical.y - dc.cy;
+    const r = Math.sqrt(x * x + y * y);
+    const t = Math.floor((g.rMax - r) / g.ringWidth);
+    if (t < 0 || t >= g.trackMax) continue;
+    let ang = Math.atan2(y, x) + Math.PI / 2;
+    if (ang < 0) ang += Math.PI * 2;
+    const frac = ang / (Math.PI * 2);
+    return { side: dc.side, t, frac, valid: true };
+  }
+  return { valid: false };
+}
+
+function handleClick(e) {
+  const p = pointToTrackAngle(e.clientX, e.clientY);
+  if (!p.valid) return;
+  selected = { side: p.side, track: p.t };
+  ensureDetailLoaded(p.side, p.t);
+  const key = detailKey(p.side, p.t);
+  if (detailCache[key]) populateRevolutionSelect(detailCache[key].revolutions.length);
+  draw();
+}
+
+function hoverTooltip(e) {
+  const p = pointToTrackAngle(e.clientX, e.clientY);
+  if (!p.valid) { tooltip.style.display = 'none'; return; }
+
+  const info = trackInfo(p.side, p.t);
+  let lines = [`side ${p.side}, track ${p.t}`, `angle ${(p.frac * 360).toFixed(1)}°`];
+
+  for (const sec of info.sectors) {
+    if (sec.revolution !== revolution) continue;
+    if (p.frac >= sec.data_frac0 && p.frac < sec.data_frac1) {
+      lines.push(`sector ${sec.num}: data ${sec.data_ok ? 'OK' : 'ERR'}`);
+    } else if (p.frac >= sec.id_frac0 && p.frac < sec.id_frac1) {
+      lines.push(`sector ${sec.num}: ID ${sec.id_ok ? 'OK' : 'ERR'}`);
+    }
+  }
+  for (const fs of info.filesystem) {
+    const sec = findSectorEntry(p.side, p.t, fs.sector);
+    if (sec && p.frac >= sec.data_frac0 && p.frac < sec.data_frac1) {
+      const passSec = info.sectors.find(se => se.num === fs.sector && se.revolution === revolution);
+      const passStatus = passSec ? (passSec.data_ok ? 'OK' : 'ERR') : 'not attempted';
+      lines.push(`region: ${fs.region}${fs.file ? ' (' + fs.file + ')' : ''}`);
+      lines.push(`  pass ${revolution}: ${passStatus}`);
+    }
+  }
+
+  tooltip.textContent = lines.join('\n');
+  tooltip.style.display = 'block';
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top = (e.clientY + 14) + 'px';
+}
+
+// ---- controls ----
+
+sideSel.addEventListener('change', () => { side = sideSel.value; draw(); });
+function updateRevolutionAvailability() {
+  // "Final" shows whichever pass recovered each sector, not one specific
+  // pass, so the revolution dropdown doesn't apply to it.
+  revSel.disabled = (layer === 'final');
+  revSel.title = revSel.disabled ? 'Final layer combines all passes; revolution selection doesn\'t apply' : '';
+}
+
+layerSel.addEventListener('change', () => {
+  layer = layerSel.value;
+  buildLegend();
+  updateRevolutionAvailability();
+  updateFilePanelCurrentRevolution();
+  draw();
+});
+revSel.addEventListener('change', () => {
+  revolution = +revSel.value;
+  updateFilePanelCurrentRevolution();
+  draw();
+});
+
+// ---- boot ----
+
+const params = new URLSearchParams(location.search);
+
+fetch('disk.json')
+  .then(r => r.json())
+  .then(data => {
+    diskData = data;
+    statusEl.textContent = '';
+    sideSel.innerHTML = '';
+    for (let s = 0; s < diskData.sides; s++) {
+      const o = document.createElement('option');
+      o.value = s; o.textContent = s;
+      sideSel.appendChild(o);
+    }
+    if (diskData.sides > 1) {
+      const bothOpt = document.createElement('option');
+      bothOpt.value = 'both'; bothOpt.textContent = 'Both';
+      sideSel.appendChild(bothOpt);
+    }
+
+    if (params.has('side')) { side = params.get('side'); sideSel.value = side; }
+    if (params.has('layer')) { layer = params.get('layer'); layerSel.value = layer; }
+
+    let maxRev = 1;
+    for (const s of diskData.side) for (const t of s.track) maxRev = Math.max(maxRev, t.revolutions);
+    populateRevolutionSelect(maxRev);
+    if (params.has('revolution')) { revolution = +params.get('revolution'); revSel.value = revolution; }
+
+    buildLegend();
+    updateRevolutionAvailability();
+    buildFilePanel(maxRev);
+    if (params.has('file')) { selectedFile = params.get('file'); buildFilePanel(maxRev); }
+    resize();
+
+    if (params.has('track')) {
+      const trackSide = activeSides()[0];
+      selected = { side: trackSide, track: +params.get('track') };
+      ensureDetailLoaded(trackSide, selected.track);
+    }
+    if (params.has('scale')) {
+      view.scale = +params.get('scale');
+      draw();
+    }
+  })
+  .catch(err => {
+    statusEl.textContent = 'failed to load disk.json: ' + err;
+  });
+
+resize();
+</script>
+</body>
+</html>

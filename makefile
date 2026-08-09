@@ -12,7 +12,8 @@ SRCS = disk-analysis.c \
        kf-info.c \
        kf-oob.c \
        atari-fs.c \
-       visualise.c
+       visualise.c \
+       json-export.c
 
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
